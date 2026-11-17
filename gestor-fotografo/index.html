@@ -75,7 +75,6 @@ header img{height:38px}
     <div style="display:flex;gap:6px;align-items:center">
       <input id="q" placeholder="Buscar cliente o trabajo" style="max-width:220px;padding:8px 10px">
       <button class="ic" id="bkbtn" title="Descargar backup en Excel"><i class="ti ti-download"></i><span class="hdtx">Backup</span></button>
-      <span id="who" class="sm muted" style="display:flex;align-items:center;gap:4px"></span>
       <button class="ic" id="outbtn" title="Cerrar sesión"><i class="ti ti-logout"></i></button>
     </div>
   </header>
@@ -86,8 +85,8 @@ header img{height:38px}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, createUserWithEmailAndPassword, inMemoryPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, setDoc, getDoc, getDocs, onSnapshot, serverTimestamp, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCsq4hOoYMv4sly5Wz8FMOgON7x4pgDrHU",
@@ -111,8 +110,7 @@ const MS=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Sep
 const MC=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 
 let U=null, unsubs=[];
-const S={tab:"inicio",q:"",sel:null,cm:new Date(),cl:[],tr:[],ta:[],fin:{},miembros:[],me:null,filtroTa:"pend"};
-const ADM=()=>S.me&&S.me.rol==="admin";
+const S={tab:"inicio",q:"",sel:null,cm:new Date(),cl:[],tr:[],ta:[],filtroTa:"pend"};
 S.cm=new Date(S.cm.getFullYear(),S.cm.getMonth(),1);
 
 const $=s=>document.querySelector(s);
@@ -123,12 +121,10 @@ const fd=f=>{if(!f)return"-";const[y,m,d]=f.split("-");return d+"/"+m+"/"+y.slic
 const pill=(t,c)=>`<span class="pl" style="background:${C[c][0]};color:${C[c][1]}">${esc(t)}</span>`;
 const et=k=>ET.find(e=>e[0]==k)||ET[0];
 const cli=id=>S.cl.find(c=>c.id==id)||{nombre:"(cliente borrado)",telefono:""};
-const fin=t=>S.fin[t.id]||{total:0,pagos:[]};
-const pagado=t=>(fin(t).pagos||[]).reduce((s,p)=>s+(+p.monto||0),0);
-const saldo=t=>(+fin(t).total||0)-pagado(t);
-const col=n=>collection(db,n);
-const dref=(n,id)=>doc(db,n,id);
-const firma=()=>({editadoPor:S.me?.nombre||"",editadoEn:serverTimestamp()});
+const pagado=t=>(t.pagos||[]).reduce((s,p)=>s+(+p.monto||0),0);
+const saldo=t=>(+t.total||0)-pagado(t);
+const col=n=>collection(db,"usuarios",U.uid,n);
+const dref=(n,id)=>doc(db,"usuarios",U.uid,n,id);
 const iniciales=n=>String(n||"?").split(" ").filter(Boolean).map(w=>w[0]).slice(0,2).join("").toUpperCase();
 const avc=id=>AV[[...String(id)].reduce((s,c)=>s+c.charCodeAt(0),0)%4];
 const waLink=t=>{let n=String(t||"").replace(/\D/g,"");if(!n)return"";if(!n.startsWith("54"))n="549"+n;return"https://wa.me/"+n;};
@@ -145,47 +141,17 @@ $("#lbtn").onclick=async()=>{
 };
 $("#lpw").onkeydown=e=>{if(e.key==="Enter")$("#lbtn").click();};
 $("#outbtn").onclick=()=>{if(confirm("¿Cerrar sesión?"))signOut(auth);};
-function sinAcceso(msg){$("#loading").classList.add("hide");$("#app").classList.add("hide");$("#login").classList.remove("hide");$("#ler").textContent=msg;signOut(auth);}
-onAuthStateChanged(auth,async u=>{
-  unsubs.forEach(f=>f());unsubs=[];U=u;S.me=null;S.fin={};S.miembros=[];
-  if(!u){$("#loading").classList.add("hide");$("#app").classList.add("hide");$("#login").classList.remove("hide");return;}
-  let m=null;
-  try{const d=await getDoc(dref("miembros",u.uid));if(d.exists())m=d.data();}catch(e){}
-  if(!m){
-    try{m={nombre:"Gustavo",email:u.email,rol:"admin",activo:true};await setDoc(dref("miembros",u.uid),{...m,creado:serverTimestamp()});}
-    catch(e){return sinAcceso("Esta cuenta no tiene acceso. Pedile al administrador que te habilite.");}
-  }
-  if(!m.activo)return sinAcceso("Tu acceso fue desactivado. Consultá con el administrador.");
-  S.me={uid:u.uid,...m};
-  $("#loading").classList.add("hide");$("#login").classList.add("hide");$("#app").classList.remove("hide");
-  $("#bkbtn").classList.toggle("hide",!ADM());
-  $("#who").innerHTML=`<i class="ti ti-user-circle"></i><span class="hdtx">${esc(S.me.nombre)}${ADM()?"":" · Secretario/a"}</span>`;
-  if(ADM())await migrar();
+onAuthStateChanged(auth,u=>{
+  unsubs.forEach(f=>f());unsubs=[];U=u;$("#loading").classList.add("hide");
+  if(!u){$("#app").classList.add("hide");$("#login").classList.remove("hide");return;}
+  $("#login").classList.add("hide");$("#app").classList.remove("hide");
   const sub=(n,k)=>unsubs.push(onSnapshot(col(n),s=>{S[k]=s.docs.map(d=>({id:d.id,...d.data()}));r();},e=>toast("Error de conexión: "+e.code)));
   sub("clientes","cl");sub("trabajos","tr");sub("tareas","ta");
-  if(ADM()){
-    unsubs.push(onSnapshot(col("finanzas"),s=>{S.fin={};s.docs.forEach(d=>S.fin[d.id]=d.data());r();}));
-    sub("miembros","miembros");
-  }
 });
-
-/* Pasa los datos de la versión anterior (carpeta personal) a la base compartida, una sola vez */
-async function migrar(){
-  try{
-    const est=await getDoc(dref("config","estado"));if(est.exists()&&est.data().migrado)return;
-    const old=n=>getDocs(collection(db,"usuarios",U.uid,n));
-    const [oc,ot,oa]=await Promise.all([old("clientes"),old("trabajos"),old("tareas")]);
-    for(const d of oc.docs)await setDoc(dref("clientes",d.id),d.data());
-    for(const d of ot.docs){const {total,pagos,...resto}=d.data();await setDoc(dref("trabajos",d.id),resto);await setDoc(dref("finanzas",d.id),{total:+total||0,pagos:pagos||[]});}
-    for(const d of oa.docs)await setDoc(dref("tareas",d.id),d.data());
-    await setDoc(dref("config","estado"),{migrado:true,fecha:serverTimestamp()});
-    if(oc.size||ot.size)toast("Tus datos se pasaron a la base compartida");
-  }catch(e){toast("No se pudo migrar: "+(e.code||e.message));}
-}
 
 /* ---------- NAV ---------- */
 function nav(){
-  const t=[["inicio","Inicio","home"],["trabajos","Trabajos","briefcase"],["agenda","Agenda","calendar"],["clientes","Clientes","users"],["tareas","Tareas","checklist"]];if(ADM())t.push(["equipo","Equipo","users-group"]);
+  const t=[["inicio","Inicio","home"],["trabajos","Trabajos","briefcase"],["agenda","Agenda","calendar"],["clientes","Clientes","users"],["tareas","Tareas","checklist"]];
   $("#nv").innerHTML=t.map(x=>`<button class="${S.tab==x[0]||(S.tab=="detalle"&&x[0]=="trabajos")||(S.tab=="cliente"&&x[0]=="clientes")?"on":""}" data-go="${x[0]}"><i class="ti ti-${x[2]}"></i> ${x[1]}</button>`).join("");
 }
 window.go=t=>{S.tab=t;S.sel=null;r();window.scrollTo(0,0);};
@@ -208,7 +174,7 @@ function inicio(){
   const edic=S.tr.filter(t=>t.etapa=="edicion"||t.etapa=="sesion").length;
   const mc=(l,v,c)=>`<div class="mt"><div class="l">${l}</div><div class="v" style="color:${c}">${v}</div></div>`;
   if(!S.cl.length&&!S.tr.length)return `<div class="cd" style="text-align:center;padding:36px 20px"><i class="ti ti-camera" style="font-size:40px;color:var(--mag)"></i><h2 style="font-weight:600;margin:10px 0 6px">Cargá tu primer trabajo</h2><p class="muted" style="margin:0 0 16px">Registrá al cliente, la fecha, el servicio y lo que acordaron. Así no se te escapa nada.</p><button class="bp" onclick="formTr()"><i class="ti ti-plus"></i> Nuevo trabajo</button></div>`;
-  return `<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:14px">${mc("Próximos trabajos",S.tr.filter(t=>t.fecha>=H).length,"var(--vio)")}${mc("Por editar o entregar",edic,"var(--mag)")}${ADM()?mc("Saldo a cobrar",money(sal),"var(--ora-t)"):""}${mc("Tareas pendientes",S.ta.filter(t=>!t.hecha).length,"var(--deep)")}</div>
+  return `<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:14px">${mc("Próximos trabajos",S.tr.filter(t=>t.fecha>=H).length,"var(--vio)")}${mc("Por editar o entregar",edic,"var(--mag)")}${mc("Saldo a cobrar",money(sal),"var(--ora-t)")}${mc("Tareas pendientes",S.ta.filter(t=>!t.hecha).length,"var(--deep)")}</div>
   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
   <div class="cd"><div style="display:flex;justify-content:space-between;align-items:center"><b>Próximos trabajos</b><button class="bp" onclick="formTr()"><i class="ti ti-plus"></i> Nuevo</button></div>${prox.map(trRow).join("")||'<p class="muted sm">No hay trabajos próximos.</p>'}</div>
   <div class="cd"><b>Para hacer</b>${pend.map(taRow).join("")||'<p class="muted sm">Todo al día.</p>'}</div></div>`;
@@ -217,7 +183,7 @@ function filtTr(){const q=S.q.toLowerCase().trim();return S.tr.filter(t=>!q||cli
 function trabajos(){
   const l=filtTr().sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha)));
   return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px"><span class="muted sm">De la consulta a la entrega${S.q?` · filtrando por "${esc(S.q)}"`:""}</span><button class="bp" onclick="formTr()"><i class="ti ti-plus"></i> Nuevo trabajo</button></div>
-  <div class="kan">${ET.map(e=>{const it=l.filter(t=>t.etapa==e[0]);return `<div class="mt" style="padding:10px"><div style="display:flex;justify-content:space-between;margin-bottom:8px">${pill(e[1],e[2])}<span class="sm muted">${it.length}</span></div>${it.map(t=>`<div class="cd clk" style="padding:9px 10px;margin-bottom:6px" onclick="verTr('${t.id}')"><div style="font-weight:600;font-size:14px">${esc(cli(t.clienteId).nombre)}</div><div class="sm muted">${esc(t.tipo)} · ${fd(t.fecha)}</div>${ADM()&&saldo(t)>0?`<div class="sm" style="color:var(--ora-t)">Saldo ${money(saldo(t))}</div>`:""}</div>`).join("")}</div>`}).join("")}</div>`;
+  <div class="kan">${ET.map(e=>{const it=l.filter(t=>t.etapa==e[0]);return `<div class="mt" style="padding:10px"><div style="display:flex;justify-content:space-between;margin-bottom:8px">${pill(e[1],e[2])}<span class="sm muted">${it.length}</span></div>${it.map(t=>`<div class="cd clk" style="padding:9px 10px;margin-bottom:6px" onclick="verTr('${t.id}')"><div style="font-weight:600;font-size:14px">${esc(cli(t.clienteId).nombre)}</div><div class="sm muted">${esc(t.tipo)} · ${fd(t.fecha)}</div>${saldo(t)>0?`<div class="sm" style="color:var(--ora-t)">Saldo ${money(saldo(t))}</div>`:""}</div>`).join("")}</div>`}).join("")}</div>`;
 }
 window.verTr=id=>{S.sel=id;S.tab="detalle";r();window.scrollTo(0,0);};
 function detalle(){
@@ -229,14 +195,13 @@ function detalle(){
   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap"><div><div style="font-size:19px;font-weight:600">${esc(t.tipo)} · <span class="clk" style="color:var(--deep)" onclick="verCl('${c.id}')">${esc(c.nombre)}</span></div>
   <div class="sm muted" style="margin-top:4px"><i class="ti ti-calendar"></i> ${fd(t.fecha)} ${esc(t.hora||"")} hs · <i class="ti ti-map-pin"></i> ${esc(t.lugar||"A definir")}</div>
   <div class="sm muted"><i class="ti ti-phone"></i> ${esc(c.telefono||"-")}${c.origen?" · llegó por "+esc(c.origen):""}</div></div>
-  <div style="display:flex;gap:6px;flex-wrap:wrap">${wa?`<a href="${wa}" target="_blank" rel="noopener"><button class="ic" title="WhatsApp"><i class="ti ti-brand-whatsapp" style="color:#1d9e55"></i></button></a>`:""}<button class="ic" title="Editar" onclick="formTr('${t.id}')"><i class="ti ti-edit"></i></button>${ADM()?`<button class="ic bd" title="Borrar" onclick="delTr('${t.id}')"><i class="ti ti-trash"></i></button>`:""}</div></div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap">${wa?`<a href="${wa}" target="_blank" rel="noopener"><button class="ic" title="WhatsApp"><i class="ti ti-brand-whatsapp" style="color:#1d9e55"></i></button></a>`:""}<button class="ic" title="Editar" onclick="formTr('${t.id}')"><i class="ti ti-edit"></i></button><button class="ic bd" title="Borrar" onclick="delTr('${t.id}')"><i class="ti ti-trash"></i></button></div></div>
   <div style="display:flex;gap:4px;margin:16px 0">${ET.map((e,k)=>`<div onclick="setE('${t.id}','${e[0]}')" style="flex:1;cursor:pointer;text-align:center;font-size:11px"><div style="height:7px;border-radius:4px;background:${k<=ci?colr:"rgba(0,0,0,.1)"};margin-bottom:4px"></div><span style="color:${k==ci?"var(--tx)":"var(--tx3)"};font-weight:${k==ci?600:400}">${e[1]}</span></div>`).join("")}</div>
-  ${ADM()?`<div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:12px"><div class="mt"><div class="l">Total</div><div style="font-weight:600">${money(fin(t).total)}</div></div><div class="mt"><div class="l">Pagado</div><div style="font-weight:600">${money(pagado(t))}</div></div><div class="mt"><div class="l">Saldo</div><div style="font-weight:600;color:${saldo(t)>0?"var(--ora-t)":"var(--ok)"}">${money(saldo(t))}</div></div></div>`:""}
+  <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:12px"><div class="mt"><div class="l">Total</div><div style="font-weight:600">${money(t.total)}</div></div><div class="mt"><div class="l">Pagado</div><div style="font-weight:600">${money(pagado(t))}</div></div><div class="mt"><div class="l">Saldo</div><div style="font-weight:600;color:${saldo(t)>0?"var(--ora-t)":"var(--ok)"}">${money(saldo(t))}</div></div></div>
   <span class="lb">Servicio contratado</span><div>${esc(t.servicio||"-")}</div>
   <span class="lb">Lo que se acordó</span><div style="background:var(--soft);padding:10px 12px;border-radius:8px;white-space:pre-wrap">${esc(t.acordado||"-")}</div>
-  ${t.editadoPor?`<div class="sm muted" style="margin-top:10px"><i class="ti ti-history"></i> Última modificación: ${esc(t.editadoPor)}</div>`:""}
-  <div style="display:flex;gap:6px;margin-top:14px;flex-wrap:wrap">${ADM()?`<button onclick="formPago('${t.id}')"><i class="ti ti-cash"></i> Registrar pago</button>`:""}${ci<5?`<button class="bp" onclick="setE('${t.id}','${ET[ci+1][0]}')"><i class="ti ti-arrow-right"></i> Pasar a ${ET[ci+1][1]}</button>`:""}<button onclick="resumen('${t.id}')"><i class="ti ti-send"></i> Enviar resumen al cliente</button></div>
-  ${ADM()&&(fin(t).pagos||[]).length?`<span class="lb" style="margin-top:16px">Pagos</span>${fin(t).pagos.map((p,k)=>`<div class="row"><i class="ti ti-cash" style="color:var(--ok)"></i><div style="flex:1">${money(p.monto)} <span class="sm muted">${esc(p.nota||"")}</span></div><span class="sm muted">${fd(p.fecha)}</span><button class="ic" style="border:none" title="Quitar pago" onclick="delPago('${t.id}',${k})"><i class="ti ti-x" style="color:var(--tx3)"></i></button></div>`).join("")}`:""}
+  <div style="display:flex;gap:6px;margin-top:14px;flex-wrap:wrap"><button onclick="formPago('${t.id}')"><i class="ti ti-cash"></i> Registrar pago</button>${ci<5?`<button class="bp" onclick="setE('${t.id}','${ET[ci+1][0]}')"><i class="ti ti-arrow-right"></i> Pasar a ${ET[ci+1][1]}</button>`:""}<button onclick="resumen('${t.id}')"><i class="ti ti-send"></i> Enviar resumen al cliente</button></div>
+  ${(t.pagos||[]).length?`<span class="lb" style="margin-top:16px">Pagos</span>${t.pagos.map((p,k)=>`<div class="row"><i class="ti ti-cash" style="color:var(--ok)"></i><div style="flex:1">${money(p.monto)} <span class="sm muted">${esc(p.nota||"")}</span></div><span class="sm muted">${fd(p.fecha)}</span><button class="ic" style="border:none" title="Quitar pago" onclick="delPago('${t.id}',${k})"><i class="ti ti-x" style="color:var(--tx3)"></i></button></div>`).join("")}`:""}
   <span class="lb" style="margin-top:16px">Tareas de este trabajo</span>${ts.map(taRow).join("")||'<div class="sm muted">Sin tareas.</div>'}
   <div style="display:flex;gap:6px;margin-top:10px"><input id="nt" placeholder="Ej: entregar fotos editadas"><input id="ntf" type="date" value="${hoy()}" style="max-width:160px"><button class="bp ic" onclick="addTa('${t.id}')"><i class="ti ti-plus"></i></button></div></div>`;
 }
@@ -255,7 +220,7 @@ function clientes(){
   const q=S.q.toLowerCase().trim();const l=S.cl.filter(c=>!q||c.nombre.toLowerCase().includes(q)||String(c.telefono).includes(q)||String(c.instagram||"").toLowerCase().includes(q)).sort((a,b)=>a.nombre.localeCompare(b.nombre));
   return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px"><span class="muted sm">${S.cl.length} clientes</span><div style="display:flex;gap:6px"><button onclick="formCl()"><i class="ti ti-user-plus"></i> Nuevo cliente</button><button class="bp" onclick="formTr()"><i class="ti ti-plus"></i> Nuevo trabajo</button></div></div>
   <div class="cd">${l.map(c=>{const ts=S.tr.filter(t=>t.clienteId==c.id);const sal=ts.reduce((s,t)=>s+Math.max(0,saldo(t)),0);
-  return `<div class="row clk" onclick="verCl('${c.id}')" style="align-items:flex-start"><div class="av" style="background:${avc(c.id)}">${esc(iniciales(c.nombre))}</div><div style="flex:1;min-width:0"><div style="font-weight:600">${esc(c.nombre)}</div><div class="sm muted">${esc(c.telefono||"")}${c.origen?" · "+esc(c.origen):""}</div><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">${ts.map(t=>pill(t.tipo+" "+fd(t.fecha),et(t.etapa)[2])).join("")}</div></div>${ADM()&&sal>0?`<span class="sm" style="color:var(--ora-t);font-weight:600">Debe ${money(sal)}</span>`:""}</div>`}).join("")||'<p class="muted sm">Sin clientes.</p>'}</div>`;
+  return `<div class="row clk" onclick="verCl('${c.id}')" style="align-items:flex-start"><div class="av" style="background:${avc(c.id)}">${esc(iniciales(c.nombre))}</div><div style="flex:1;min-width:0"><div style="font-weight:600">${esc(c.nombre)}</div><div class="sm muted">${esc(c.telefono||"")}${c.origen?" · "+esc(c.origen):""}</div><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">${ts.map(t=>pill(t.tipo+" "+fd(t.fecha),et(t.etapa)[2])).join("")}</div></div>${sal>0?`<span class="sm" style="color:var(--ora-t);font-weight:600">Debe ${money(sal)}</span>`:""}</div>`}).join("")||'<p class="muted sm">Sin clientes.</p>'}</div>`;
 }
 window.verCl=id=>{S.sel=id;S.tab="cliente";r();window.scrollTo(0,0);};
 function cliente(){
@@ -263,7 +228,7 @@ function cliente(){
   const ts=S.tr.filter(t=>t.clienteId==c.id).sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));const wa=waLink(c.telefono);
   return `<button onclick="go('clientes')" style="margin-bottom:12px"><i class="ti ti-arrow-left"></i> Volver</button>
   <div class="cd"><div style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap"><div style="display:flex;gap:12px;align-items:center"><div class="av" style="background:${avc(c.id)};width:48px;height:48px;font-size:16px">${esc(iniciales(c.nombre))}</div><div><div style="font-size:19px;font-weight:600">${esc(c.nombre)}</div><div class="sm muted">${esc(c.telefono||"-")}${c.instagram?" · @"+esc(String(c.instagram).replace(/^@/,"")):""}${c.origen?" · llegó por "+esc(c.origen):""}</div></div></div>
-  <div style="display:flex;gap:6px">${wa?`<a href="${wa}" target="_blank" rel="noopener"><button class="ic"><i class="ti ti-brand-whatsapp" style="color:#1d9e55"></i></button></a>`:""}<button class="ic" onclick="formCl('${c.id}')"><i class="ti ti-edit"></i></button>${ADM()?`<button class="ic bd" onclick="delCl('${c.id}')"><i class="ti ti-trash"></i></button>`:""}</div></div>
+  <div style="display:flex;gap:6px">${wa?`<a href="${wa}" target="_blank" rel="noopener"><button class="ic"><i class="ti ti-brand-whatsapp" style="color:#1d9e55"></i></button></a>`:""}<button class="ic" onclick="formCl('${c.id}')"><i class="ti ti-edit"></i></button><button class="ic bd" onclick="delCl('${c.id}')"><i class="ti ti-trash"></i></button></div></div>
   ${c.notas?`<span class="lb">Notas</span><div style="background:var(--soft);padding:10px 12px;border-radius:8px;white-space:pre-wrap">${esc(c.notas)}</div>`:""}
   <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px"><b>Trabajos</b><button class="bp" onclick="formTr(null,'${c.id}')"><i class="ti ti-plus"></i> Nuevo trabajo</button></div>
   ${ts.map(trRow).join("")||'<p class="sm muted">Sin trabajos todavía.</p>'}</div>`;
@@ -276,41 +241,9 @@ function tareas(){
 }
 window.S_ta=v=>{S.filtroTa=v;r();};
 
-function equipo(){
-  const l=[...S.miembros].sort((a,b)=>(a.rol=="admin"?-1:1)-(b.rol=="admin"?-1:1)||String(a.nombre).localeCompare(String(b.nombre)));
-  return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px"><span class="muted sm">Quiénes pueden entrar a la app</span><button class="bp" onclick="formMiembro()"><i class="ti ti-user-plus"></i> Agregar secretario/a</button></div>
-  <div class="cd">${l.map(m=>`<div class="row"><div class="av" style="background:${m.rol=="admin"?"var(--deep)":avc(m.id)}">${esc(iniciales(m.nombre))}</div><div style="flex:1;min-width:0"><div style="font-weight:600">${esc(m.nombre)} ${m.rol=="admin"?pill("Administrador","deep"):pill("Secretario/a","vio")}</div><div class="sm muted">${esc(m.email||"")}</div></div>${m.rol=="admin"?"":m.activo?`<span class="sm" style="color:var(--ok)">Activo</span><button onclick="setActivo('${m.id}',false)">Desactivar</button>`:`<span class="sm muted">Desactivado</span><button onclick="setActivo('${m.id}',true)">Activar</button>`}</div>`).join("")}</div>
-  <div class="mt" style="margin-top:12px;font-size:13px;color:var(--tx2)"><i class="ti ti-lock"></i> Los secretarios ven y editan clientes, trabajos, etapas, agenda y tareas. No ven totales, señas, pagos ni saldos, y no pueden borrar trabajos ni clientes ni descargar el backup.</div>`;
-}
-window.setActivo=(uid,v)=>{if(!v&&!confirm("¿Desactivar este acceso? No va a poder entrar más hasta que lo vuelvas a activar."))return;guardar(()=>updateDoc(dref("miembros",uid),{activo:v}),v?"Acceso activado":"Acceso desactivado");};
-let auth2=null;
-window.formMiembro=()=>{
-  modal(`${head("Agregar secretario/a")}
-  <span class="lb">Nombre</span><input id="mn" placeholder="Laura">
-  <span class="lb">Email para entrar</span><input id="me" type="email" placeholder="laura@gmail.com" autocomplete="off">
-  <span class="lb">Contraseña (mínimo 6 caracteres)</span><input id="mp" type="text" autocomplete="off" placeholder="Pasásela a la persona">
-  <div class="err" id="mer"></div>
-  <div style="display:flex;gap:6px;margin-top:10px"><button class="bp" id="mok"><i class="ti ti-check"></i> Crear acceso</button><button onclick="cerrar()">Cancelar</button></div>`);
-  $("#mok").onclick=async()=>{
-    const n=$("#mn").value.trim(),em=$("#me").value.trim(),pw=$("#mp").value;const er=m=>$("#mer").textContent=m;
-    if(!n)return er("Ingresá el nombre");if(!em)return er("Ingresá el email");if(pw.length<6)return er("La contraseña necesita al menos 6 caracteres");
-    $("#mok").disabled=true;
-    try{
-      if(!auth2){auth2=getAuth(initializeApp(firebaseConfig,"altas"));await setPersistence(auth2,inMemoryPersistence);}
-      const cred=await createUserWithEmailAndPassword(auth2,em,pw);const uid=cred.user.uid;await signOut(auth2);
-      await setDoc(dref("miembros",uid),{nombre:n,email:em,rol:"secretario",activo:true,creado:serverTimestamp()});
-      cerrar();toast("Acceso creado para "+n);
-    }catch(e){
-      const msg={"auth/email-already-in-use":"Ese email ya tiene una cuenta","auth/invalid-email":"El email no es válido","auth/weak-password":"La contraseña es muy débil"}[e.code]||("No se pudo crear: "+(e.code||e.message));
-      er(msg);$("#mok").disabled=false;
-    }
-  };
-};
-
 function r(){
-  if(!U||!S.me)return;nav();
-  if(S.tab==="equipo"&&!ADM())S.tab="inicio";
-  const m={inicio,trabajos,agenda,clientes,tareas,detalle,cliente,equipo};
+  if(!U)return;nav();
+  const m={inicio,trabajos,agenda,clientes,tareas,detalle,cliente};
   const a=document.activeElement;const keep=a&&a.id==="nt"?{v:a.value}:null;
   $("#v").innerHTML=m[S.tab]();
   if(keep&&$("#nt")){$("#nt").value=keep.v;$("#nt").focus();}
@@ -322,11 +255,11 @@ async function guardar(fn,msg){try{await fn();if(msg)toast(msg);return true;}cat
 window.tk=(id,v)=>guardar(()=>updateDoc(dref("tareas",id),{hecha:v}));
 window.delTa=id=>{if(confirm("¿Borrar esta tarea?"))guardar(()=>deleteDoc(dref("tareas",id)),"Tarea borrada");};
 window.addTa=trid=>{const x=$("#nt").value.trim();if(!x){$("#nt").focus();return;}guardar(()=>addDoc(col("tareas"),{texto:x,fecha:$("#ntf").value||hoy(),hecha:false,trabajoId:trid||null,creado:serverTimestamp()}),"Tarea agregada");$("#nt").value="";};
-window.setE=(id,e)=>guardar(()=>updateDoc(dref("trabajos",id),{etapa:e,...firma()}),"Etapa: "+et(e)[1]);
-window.delTr=id=>{if(!ADM())return;if(!confirm("¿Borrar este trabajo? Se borran también sus tareas y pagos. No se puede deshacer."))return;
-  guardar(async()=>{for(const t of S.ta.filter(x=>x.trabajoId==id))await deleteDoc(dref("tareas",t.id));await deleteDoc(dref("finanzas",id));await deleteDoc(dref("trabajos",id));},"Trabajo borrado");go("trabajos");};
-window.delCl=id=>{if(!ADM())return;const n=S.tr.filter(t=>t.clienteId==id).length;if(n){alert("Este cliente tiene "+n+" trabajo(s). Borralos primero.");return;}if(confirm("¿Borrar este cliente?")){guardar(()=>deleteDoc(dref("clientes",id)),"Cliente borrado");go("clientes");}};
-window.delPago=(id,k)=>{if(!ADM()||!confirm("¿Quitar este pago?"))return;const p=[...(S.fin[id]?.pagos||[])];p.splice(k,1);guardar(()=>setDoc(dref("finanzas",id),{pagos:p},{merge:true}),"Pago quitado");};
+window.setE=(id,e)=>guardar(()=>updateDoc(dref("trabajos",id),{etapa:e}),"Etapa: "+et(e)[1]);
+window.delTr=id=>{if(!confirm("¿Borrar este trabajo? Se borran también sus tareas. No se puede deshacer."))return;
+  guardar(async()=>{for(const t of S.ta.filter(x=>x.trabajoId==id))await deleteDoc(dref("tareas",t.id));await deleteDoc(dref("trabajos",id));},"Trabajo borrado");go("trabajos");};
+window.delCl=id=>{const n=S.tr.filter(t=>t.clienteId==id).length;if(n){alert("Este cliente tiene "+n+" trabajo(s). Borralos primero.");return;}if(confirm("¿Borrar este cliente?")){guardar(()=>deleteDoc(dref("clientes",id)),"Cliente borrado");go("clientes");}};
+window.delPago=(id,k)=>{if(!confirm("¿Quitar este pago?"))return;const t=S.tr.find(x=>x.id==id);const p=[...(t.pagos||[])];p.splice(k,1);guardar(()=>updateDoc(dref("trabajos",id),{pagos:p}),"Pago quitado");};
 
 /* ---------- MODALES ---------- */
 function modal(html){$("#modal").innerHTML=`<div class="ov" onclick="if(event.target===this)cerrar()"><div class="md">${html}</div></div>`;document.body.style.overflow="hidden";}
@@ -335,14 +268,14 @@ const opts=(arr,sel)=>arr.map(o=>`<option ${o==sel?"selected":""}>${esc(o)}</opt
 const head=t=>`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="font-size:17px;color:var(--deep)">${t}</b><button class="ic" style="border:none" onclick="cerrar()"><i class="ti ti-x"></i></button></div>`;
 
 window.formTr=(id,clId)=>{
-  const t=id?{...S.tr.find(x=>x.id==id),total:S.fin[id]?.total??""}:{etapa:"consulta",fecha:"",hora:"",total:""};const ini=id?t.clienteId:(clId||"");
+  const t=id?S.tr.find(x=>x.id==id):{etapa:"consulta",fecha:"",hora:"",total:"",pagos:[]};const ini=id?t.clienteId:(clId||"");
   const clOpts=[...S.cl].sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(c=>`<option value="${c.id}" ${c.id==ini?"selected":""}>${esc(c.nombre)}</option>`).join("");
   modal(`${head(id?"Editar trabajo":"Nuevo trabajo")}
   <span class="lb">Cliente</span><select id="fc">${S.cl.length?"":'<option value="">Sin clientes</option>'}${clOpts}<option value="new" ${!S.cl.length&&!id?"selected":""}>+ Cliente nuevo</option></select>
   <div id="fcn" style="display:${!S.cl.length&&!id?"block":"none"};background:var(--soft);padding:2px 12px 12px;border-radius:10px;margin-top:8px"><span class="lb">Nombre</span><input id="fcnn" placeholder="Carla Fernández"><div class="g2"><div><span class="lb">Teléfono</span><input id="fcnt" type="tel" placeholder="3725 40-0000"></div><div><span class="lb">Cómo llegó</span><select id="fcno">${opts(ORIG)}</select></div></div></div>
   <div class="g2"><div><span class="lb">Tipo de evento</span><select id="ft">${opts(TIPOS,t.tipo)}</select></div><div><span class="lb">Etapa</span><select id="fe">${ET.map(e=>`<option value="${e[0]}" ${e[0]==t.etapa?"selected":""}>${e[1]}</option>`).join("")}</select></div>
   <div><span class="lb">Fecha</span><input id="ff" type="date" value="${esc(t.fecha)}"></div><div><span class="lb">Hora</span><input id="fh" type="time" value="${esc(t.hora)}"></div>
-  ${ADM()?`<div><span class="lb">Total del trabajo</span><input id="ftot" type="number" inputmode="numeric" step="1000" min="0" value="${esc(t.total)}" placeholder="300000"></div>${id?"":`<div><span class="lb">Seña recibida</span><input id="fsen" type="number" inputmode="numeric" step="1000" min="0" placeholder="0"></div>`}`:""}</div>
+  <div><span class="lb">Total del trabajo</span><input id="ftot" type="number" inputmode="numeric" step="1000" min="0" value="${esc(t.total)}" placeholder="300000"></div>${id?"":`<div><span class="lb">Seña recibida</span><input id="fsen" type="number" inputmode="numeric" step="1000" min="0" placeholder="0"></div>`}</div>
   <span class="lb">Lugar</span><input id="fl" value="${esc(t.lugar)}" placeholder="Salón Los Álamos">
   <span class="lb">Servicio contratado</span><input id="fp" value="${esc(t.servicio)}" placeholder="Book + fiesta + video">
   <span class="lb">Lo que se acordó</span><textarea id="fa" rows="4" placeholder="Entrega en 30 días, álbum 30x30, 300 fotos editadas">${esc(t.acordado)}</textarea>
@@ -356,17 +289,10 @@ window.formTr=(id,clId)=>{
     if(!$("#ff").value)return er("Elegí la fecha del trabajo");
     $("#fok").disabled=true;
     const ok=await guardar(async()=>{
-      if(c=="new"){const d=await addDoc(col("clientes"),{nombre:$("#fcnn").value.trim(),telefono:$("#fcnt").value.trim(),origen:$("#fcno").value,instagram:"",notas:"",creado:serverTimestamp(),creadoPor:S.me.nombre,...firma()});c=d.id;}
-      const data={clienteId:c,tipo:$("#ft").value,etapa:$("#fe").value,fecha:$("#ff").value,hora:$("#fh").value,lugar:$("#fl").value.trim(),servicio:$("#fp").value.trim(),acordado:$("#fa").value.trim(),...firma()};
-      const total=ADM()?(+$("#ftot").value||0):null;
-      if(id){await updateDoc(dref("trabajos",id),data);if(ADM())await setDoc(dref("finanzas",id),{total},{merge:true});}
-      else{
-        const sen=ADM()?(+$("#fsen").value||0):0;
-        if(sen>0&&(data.etapa=="consulta"||data.etapa=="presupuesto"))data.etapa="senado";
-        data.creado=serverTimestamp();data.creadoPor=S.me.nombre;
-        const d=await addDoc(col("trabajos"),data);S.sel=d.id;
-        if(ADM())await setDoc(dref("finanzas",d.id),{total,pagos:sen>0?[{monto:sen,fecha:hoy(),nota:"Seña"}]:[]});
-      }
+      if(c=="new"){const d=await addDoc(col("clientes"),{nombre:$("#fcnn").value.trim(),telefono:$("#fcnt").value.trim(),origen:$("#fcno").value,instagram:"",notas:"",creado:serverTimestamp()});c=d.id;}
+      const data={clienteId:c,tipo:$("#ft").value,etapa:$("#fe").value,fecha:$("#ff").value,hora:$("#fh").value,total:+$("#ftot").value||0,lugar:$("#fl").value.trim(),servicio:$("#fp").value.trim(),acordado:$("#fa").value.trim()};
+      if(id){await updateDoc(dref("trabajos",id),data);}
+      else{const sen=+$("#fsen").value||0;data.pagos=sen>0?[{monto:sen,fecha:hoy(),nota:"Seña"}]:[];if(sen>0&&(data.etapa=="consulta"||data.etapa=="presupuesto"))data.etapa="senado";data.creado=serverTimestamp();const d=await addDoc(col("trabajos"),data);S.sel=d.id;}
     },id?"Trabajo actualizado":"Trabajo guardado");
     if(ok){cerrar();S.tab="detalle";r();}else $("#fok").disabled=false;
   };
@@ -381,8 +307,8 @@ window.formCl=id=>{
   <div class="err" id="cer"></div>
   <div style="display:flex;gap:6px;margin-top:10px"><button class="bp" id="cok"><i class="ti ti-check"></i> Guardar</button><button onclick="cerrar()">Cancelar</button></div>`);
   $("#cok").onclick=async()=>{const n=$("#cn").value.trim();if(!n){$("#cer").textContent="Ingresá el nombre";return;}
-    const data={nombre:n,telefono:$("#ct").value.trim(),instagram:$("#ci").value.trim(),origen:$("#co").value,notas:$("#cno").value.trim(),...firma()};
-    const ok=await guardar(async()=>{if(id)await updateDoc(dref("clientes",id),data);else{data.creado=serverTimestamp();data.creadoPor=S.me.nombre;const d=await addDoc(col("clientes"),data);S.sel=d.id;}},id?"Cliente actualizado":"Cliente guardado");
+    const data={nombre:n,telefono:$("#ct").value.trim(),instagram:$("#ci").value.trim(),origen:$("#co").value,notas:$("#cno").value.trim()};
+    const ok=await guardar(async()=>{if(id)await updateDoc(dref("clientes",id),data);else{data.creado=serverTimestamp();const d=await addDoc(col("clientes"),data);S.sel=d.id;}},id?"Cliente actualizado":"Cliente guardado");
     if(ok){cerrar();S.tab="cliente";r();}};
 };
 window.formPago=id=>{
@@ -392,12 +318,12 @@ window.formPago=id=>{
   <span class="lb">Nota</span><select id="pn"><option>Seña</option><option>Pago parcial</option><option>Saldo final</option><option>Transferencia</option><option>Efectivo</option></select>
   <div class="err" id="per"></div><div style="display:flex;gap:6px;margin-top:10px"><button class="bp" id="pok"><i class="ti ti-check"></i> Guardar pago</button><button onclick="cerrar()">Cancelar</button></div>`);
   $("#pok").onclick=async()=>{const v=+$("#pm").value;if(!v||v<=0){$("#per").textContent="Ingresá un monto válido";return;}
-    const p=[...(fin(t).pagos||[]),{monto:v,fecha:$("#pf").value||hoy(),nota:$("#pn").value}];
-    if(await guardar(async()=>{await setDoc(dref("finanzas",id),{pagos:p},{merge:true});if(t.etapa=="consulta"||t.etapa=="presupuesto")await updateDoc(dref("trabajos",id),{etapa:"senado",...firma()});},"Pago registrado"))cerrar();};
+    const p=[...(t.pagos||[]),{monto:v,fecha:$("#pf").value||hoy(),nota:$("#pn").value}];const upd={pagos:p};if(t.etapa=="consulta"||t.etapa=="presupuesto")upd.etapa="senado";
+    if(await guardar(()=>updateDoc(dref("trabajos",id),upd),"Pago registrado"))cerrar();};
 };
 window.resumen=id=>{
   const t=S.tr.find(x=>x.id==id),c=cli(t.clienteId);
-  const txt=`Hola ${c.nombre.split(" ")[0]}! Te paso el resumen de lo que acordamos:\n\n📸 ${t.tipo}\n📅 ${fd(t.fecha)}${t.hora?" a las "+t.hora+" hs":""}\n📍 ${t.lugar||"A definir"}\n\nServicio: ${t.servicio||"-"}\n${t.acordado?"Detalle: "+t.acordado+"\n":""}${ADM()?`\nTotal: ${money(fin(t).total)}\nPagado: ${money(pagado(t))}\nSaldo: ${money(saldo(t))}\n`:""}\nGracias por elegirnos!\nGustavo Torres Fotografías`;
+  const txt=`Hola ${c.nombre.split(" ")[0]}! Te paso el resumen de lo que acordamos:\n\n📸 ${t.tipo}\n📅 ${fd(t.fecha)}${t.hora?" a las "+t.hora+" hs":""}\n📍 ${t.lugar||"A definir"}\n\nServicio: ${t.servicio||"-"}\n${t.acordado?"Detalle: "+t.acordado+"\n":""}\nTotal: ${money(t.total)}\nPagado: ${money(pagado(t))}\nSaldo: ${money(saldo(t))}\n\nGracias por elegirnos!\nGustavo Torres Fotografías`;
   const wa=waLink(c.telefono);
   modal(`${head("Resumen para el cliente")}<textarea id="rs" rows="13">${esc(txt)}</textarea><div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">${wa?`<button class="bp" id="rwa"><i class="ti ti-brand-whatsapp"></i> Enviar por WhatsApp</button>`:'<span class="sm muted">El cliente no tiene teléfono cargado.</span>'}<button id="rcp"><i class="ti ti-copy"></i> Copiar</button></div>`);
   if(wa)$("#rwa").onclick=()=>window.open(wa+"?text="+encodeURIComponent($("#rs").value),"_blank");
@@ -406,13 +332,12 @@ window.resumen=id=>{
 
 /* ---------- BACKUP ---------- */
 $("#bkbtn").onclick=()=>{
-  if(!ADM())return;
   if(typeof XLSX==="undefined"){toast("No se pudo cargar el generador de Excel");return;}
   const wb=XLSX.utils.book_new();
   const add=(rows,name)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows.length?rows:[{"(vacío)":""}]),name);
   add(S.cl.map(c=>({ID:c.id,Nombre:c.nombre,Teléfono:c.telefono,Instagram:c.instagram,"Cómo llegó":c.origen,Notas:c.notas})),"Clientes");
-  add(S.tr.map(t=>({ID:t.id,Cliente:cli(t.clienteId).nombre,"ID cliente":t.clienteId,Tipo:t.tipo,Fecha:t.fecha,Hora:t.hora,Lugar:t.lugar,Servicio:t.servicio,Acordado:t.acordado,Etapa:et(t.etapa)[1],Total:+fin(t).total||0,Pagado:pagado(t),Saldo:saldo(t)})),"Trabajos");
-  const pg=[];S.tr.forEach(t=>(fin(t).pagos||[]).forEach(p=>pg.push({Cliente:cli(t.clienteId).nombre,Trabajo:t.tipo+" "+fd(t.fecha),"ID trabajo":t.id,Fecha:p.fecha,Monto:+p.monto||0,Nota:p.nota})));add(pg,"Pagos");
+  add(S.tr.map(t=>({ID:t.id,Cliente:cli(t.clienteId).nombre,"ID cliente":t.clienteId,Tipo:t.tipo,Fecha:t.fecha,Hora:t.hora,Lugar:t.lugar,Servicio:t.servicio,Acordado:t.acordado,Etapa:et(t.etapa)[1],Total:+t.total||0,Pagado:pagado(t),Saldo:saldo(t)})),"Trabajos");
+  const pg=[];S.tr.forEach(t=>(t.pagos||[]).forEach(p=>pg.push({Cliente:cli(t.clienteId).nombre,Trabajo:t.tipo+" "+fd(t.fecha),"ID trabajo":t.id,Fecha:p.fecha,Monto:+p.monto||0,Nota:p.nota})));add(pg,"Pagos");
   add(S.ta.map(t=>{const tr=S.tr.find(z=>z.id==t.trabajoId);return{Tarea:t.texto,Fecha:t.fecha,Hecha:t.hecha?"Sí":"No",Trabajo:tr?cli(tr.clienteId).nombre+" · "+tr.tipo:"","ID trabajo":t.trabajoId||""}}),"Tareas");
   XLSX.writeFile(wb,"backup-gustavo-torres-"+hoy()+".xlsx");toast("Backup descargado");
 };
