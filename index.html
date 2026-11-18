@@ -50,6 +50,13 @@ header img{height:38px}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--deep);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;z-index:60}
 .av{width:38px;height:38px;border-radius:50%;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;flex-shrink:0}
 .clk{cursor:pointer}
+.voz{width:100%;display:flex;align-items:center;gap:14px;padding:14px 16px;margin-bottom:14px;border-radius:14px;background:var(--deep);color:#fff;border:none;white-space:normal}
+.voz:hover{background:#3a2361}
+.vozic{width:52px;height:52px;border-radius:50%;background:var(--mag);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}
+.mic{width:84px;height:84px;border-radius:50%;background:var(--deep);border:none;color:#fff;display:flex;align-items:center;justify-content:center;font-size:36px;margin:6px auto;justify-content:center}
+.mic.on{background:var(--mag);box-shadow:0 0 0 8px rgba(187,30,159,.18)}
+.fx{border:1px dashed var(--ora-t)!important;background:#FFF6F0!important}
+.iaok{border-color:rgba(111,29,163,.45)!important;background:#FBF8FE!important}
 #login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
 .hide{display:none!important}
 @media(max-width:720px){.kan{grid-template-columns:1fr}.cal>div{min-height:58px;font-size:10px}.g2{grid-template-columns:1fr}header img{height:30px}.hdtx{display:none}}
@@ -85,9 +92,11 @@ header img{height:38px}
 <div id="modal"></div>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, createUserWithEmailAndPassword, inMemoryPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, setDoc, getDoc, getDocs, onSnapshot, serverTimestamp, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, createUserWithEmailAndPassword, inMemoryPersistence } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-auth.js";
+import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, setDoc, getDoc, getDocs, onSnapshot, serverTimestamp, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-firestore.js";
+import { getAI, getGenerativeModel, GoogleAIBackend } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-ai.js";
+import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-app-check.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCsq4hOoYMv4sly5Wz8FMOgON7x4pgDrHU",
@@ -97,10 +106,14 @@ const firebaseConfig = {
   messagingSenderId: "73327030013",
   appId: "1:73327030013:web:e7d881788da3ba4c43d894"
 };
+const RECAPTCHA_SITE_KEY = "PEGAR_CLAVE_DEL_SITIO";
+const MODELOS = ["gemini-3.6-flash","gemini-2.5-flash","gemini-2.5-flash-lite"];
 const fb = initializeApp(firebaseConfig);
+try { if(!RECAPTCHA_SITE_KEY.startsWith("PEGAR")) initializeAppCheck(fb,{provider:new ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),isTokenAutoRefreshEnabled:true}); } catch(e) { console.warn("App Check",e); }
 const auth = getAuth(fb);
 const db = getFirestore(fb);
 try { enableIndexedDbPersistence(db); } catch(e) {}
+const ai = getAI(fb,{backend:new GoogleAIBackend()});
 
 const ET=[["consulta","Consulta","gray"],["presupuesto","Presupuesto","vio"],["senado","Señado","mag"],["sesion","Sesión hecha","deep"],["edicion","En edición","ora"],["entregado","Entregado","green"]];
 const C={gray:["#F1EFE8","#444441"],vio:["#EFE3F8","#5A1786"],mag:["#F8E3F3","#8A1475"],deep:["#E9E4F2","#492D77"],ora:["#FFEBDF","#A4471A"],green:["#EAF3DE","#27500A"],red:["#FCEBEB","#791F1F"]};
@@ -119,7 +132,7 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const money=n=>"$"+Math.round(+n||0).toLocaleString("es-AR");
 const hoy=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
-const fd=f=>{if(!f)return"-";const[y,m,d]=f.split("-");return d+"/"+m+"/"+y.slice(2)};
+const fd=f=>{if(!f)return"sin fecha";const[y,m,d]=f.split("-");return d+"/"+m+"/"+y.slice(2)};
 const pill=(t,c)=>`<span class="pl" style="background:${C[c][0]};color:${C[c][1]}">${esc(t)}</span>`;
 const et=k=>ET.find(e=>e[0]==k)||ET[0];
 const cli=id=>S.cl.find(c=>c.id==id)||{nombre:"(cliente borrado)",telefono:""};
@@ -128,6 +141,7 @@ const pagado=t=>(fin(t).pagos||[]).reduce((s,p)=>s+(+p.monto||0),0);
 const saldo=t=>(+fin(t).total||0)-pagado(t);
 const col=n=>collection(db,n);
 const dref=(n,id)=>doc(db,n,id);
+const falta=t=>[!t.fecha&&"fecha",!t.hora&&"hora",!t.lugar&&"lugar"].filter(Boolean);
 const firma=()=>({editadoPor:S.me?.nombre||"",editadoEn:serverTimestamp()});
 const iniciales=n=>String(n||"?").split(" ").filter(Boolean).map(w=>w[0]).slice(0,2).join("").toUpperCase();
 const avc=id=>AV[[...String(id)].reduce((s,c)=>s+c.charCodeAt(0),0)%4];
@@ -207,8 +221,10 @@ function inicio(){
   const sal=S.tr.reduce((s,t)=>s+Math.max(0,saldo(t)),0);
   const edic=S.tr.filter(t=>t.etapa=="edicion"||t.etapa=="sesion").length;
   const mc=(l,v,c)=>`<div class="mt"><div class="l">${l}</div><div class="v" style="color:${c}">${v}</div></div>`;
-  if(!S.cl.length&&!S.tr.length)return `<div class="cd" style="text-align:center;padding:36px 20px"><i class="ti ti-camera" style="font-size:40px;color:var(--mag)"></i><h2 style="font-weight:600;margin:10px 0 6px">Cargá tu primer trabajo</h2><p class="muted" style="margin:0 0 16px">Registrá al cliente, la fecha, el servicio y lo que acordaron. Así no se te escapa nada.</p><button class="bp" onclick="formTr()"><i class="ti ti-plus"></i> Nuevo trabajo</button></div>`;
-  return `<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:14px">${mc("Próximos trabajos",S.tr.filter(t=>t.fecha>=H).length,"var(--vio)")}${mc("Por editar o entregar",edic,"var(--mag)")}${ADM()?mc("Saldo a cobrar",money(sal),"var(--ora-t)"):""}${mc("Tareas pendientes",S.ta.filter(t=>!t.hecha).length,"var(--deep)")}</div>
+  const vozBtn=`<button class="voz" onclick="voz()"><span class="vozic"><i class="ti ti-microphone"></i></span><span style="text-align:left"><b style="font-size:16px">Cargar por voz</b><br><span class="sm" style="opacity:.85">Contale a la app lo que te pidió el cliente</span></span></button>`;
+  if(!S.cl.length&&!S.tr.length)return `${vozBtn}<div class="cd" style="text-align:center;padding:36px 20px"><i class="ti ti-camera" style="font-size:40px;color:var(--mag)"></i><h2 style="font-weight:600;margin:10px 0 6px">Cargá tu primer trabajo</h2><p class="muted" style="margin:0 0 16px">Registrá al cliente, la fecha, el servicio y lo que acordaron. Así no se te escapa nada.</p><button class="bp" onclick="formTr()"><i class="ti ti-plus"></i> Nuevo trabajo</button></div>`;
+  const inc=S.tr.filter(t=>t.etapa!="entregado"&&falta(t).length);
+  return `${vozBtn}${inc.length?`<div class="cd" style="margin-bottom:14px;border-color:rgba(224,105,46,.45);background:#FFFAF6"><b style="color:var(--ora-t)"><i class="ti ti-pencil"></i> Datos a completar (${inc.length})</b>${inc.map(t=>`<div class="row clk" onclick="verTr('${t.id}')"><div style="flex:1;min-width:0"><div style="font-weight:600">${esc(cli(t.clienteId).nombre)} · ${esc(t.tipo)}</div><div class="sm" style="color:var(--ora-t)">Falta: ${falta(t).join(", ")}</div></div><i class="ti ti-chevron-right muted"></i></div>`).join("")}</div>`:""}<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:14px">${mc("Próximos trabajos",S.tr.filter(t=>t.fecha>=H).length,"var(--vio)")}${mc("Por editar o entregar",edic,"var(--mag)")}${ADM()?mc("Saldo a cobrar",money(sal),"var(--ora-t)"):""}${mc("Tareas pendientes",S.ta.filter(t=>!t.hecha).length,"var(--deep)")}</div>
   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
   <div class="cd"><div style="display:flex;justify-content:space-between;align-items:center"><b>Próximos trabajos</b><button class="bp" onclick="formTr()"><i class="ti ti-plus"></i> Nuevo</button></div>${prox.map(trRow).join("")||'<p class="muted sm">No hay trabajos próximos.</p>'}</div>
   <div class="cd"><b>Para hacer</b>${pend.map(taRow).join("")||'<p class="muted sm">Todo al día.</p>'}</div></div>`;
@@ -217,7 +233,7 @@ function filtTr(){const q=S.q.toLowerCase().trim();return S.tr.filter(t=>!q||cli
 function trabajos(){
   const l=filtTr().sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha)));
   return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px"><span class="muted sm">De la consulta a la entrega${S.q?` · filtrando por "${esc(S.q)}"`:""}</span><button class="bp" onclick="formTr()"><i class="ti ti-plus"></i> Nuevo trabajo</button></div>
-  <div class="kan">${ET.map(e=>{const it=l.filter(t=>t.etapa==e[0]);return `<div class="mt" style="padding:10px"><div style="display:flex;justify-content:space-between;margin-bottom:8px">${pill(e[1],e[2])}<span class="sm muted">${it.length}</span></div>${it.map(t=>`<div class="cd clk" style="padding:9px 10px;margin-bottom:6px" onclick="verTr('${t.id}')"><div style="font-weight:600;font-size:14px">${esc(cli(t.clienteId).nombre)}</div><div class="sm muted">${esc(t.tipo)} · ${fd(t.fecha)}</div>${ADM()&&saldo(t)>0?`<div class="sm" style="color:var(--ora-t)">Saldo ${money(saldo(t))}</div>`:""}</div>`).join("")}</div>`}).join("")}</div>`;
+  <div class="kan">${ET.map(e=>{const it=l.filter(t=>t.etapa==e[0]);return `<div class="mt" style="padding:10px"><div style="display:flex;justify-content:space-between;margin-bottom:8px">${pill(e[1],e[2])}<span class="sm muted">${it.length}</span></div>${it.map(t=>`<div class="cd clk" style="padding:9px 10px;margin-bottom:6px" onclick="verTr('${t.id}')"><div style="font-weight:600;font-size:14px">${esc(cli(t.clienteId).nombre)}</div><div class="sm muted">${esc(t.tipo)} · ${fd(t.fecha)}</div>${falta(t).length&&t.etapa!="entregado"?`<div class="sm" style="color:var(--ora-t)"><i class="ti ti-pencil"></i> A completar</div>`:""}${ADM()&&saldo(t)>0?`<div class="sm" style="color:var(--ora-t)">Saldo ${money(saldo(t))}</div>`:""}</div>`).join("")}</div>`}).join("")}</div>`;
 }
 window.verTr=id=>{S.sel=id;S.tab="detalle";r();window.scrollTo(0,0);};
 function detalle(){
@@ -227,15 +243,16 @@ function detalle(){
   return `<button onclick="go('trabajos')" style="margin-bottom:12px"><i class="ti ti-arrow-left"></i> Volver</button>
   <div class="cd">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap"><div><div style="font-size:19px;font-weight:600">${esc(t.tipo)} · <span class="clk" style="color:var(--deep)" onclick="verCl('${c.id}')">${esc(c.nombre)}</span></div>
-  <div class="sm muted" style="margin-top:4px"><i class="ti ti-calendar"></i> ${fd(t.fecha)} ${esc(t.hora||"")} hs · <i class="ti ti-map-pin"></i> ${esc(t.lugar||"A definir")}</div>
+  <div class="sm muted" style="margin-top:4px"><i class="ti ti-calendar"></i> ${fd(t.fecha)} ${t.hora?esc(t.hora)+" hs":""} · <i class="ti ti-map-pin"></i> ${esc(t.lugar||"Lugar a definir")}</div>
   <div class="sm muted"><i class="ti ti-phone"></i> ${esc(c.telefono||"-")}${c.origen?" · llegó por "+esc(c.origen):""}</div></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">${wa?`<a href="${wa}" target="_blank" rel="noopener"><button class="ic" title="WhatsApp"><i class="ti ti-brand-whatsapp" style="color:#1d9e55"></i></button></a>`:""}<button class="ic" title="Editar" onclick="formTr('${t.id}')"><i class="ti ti-edit"></i></button>${ADM()?`<button class="ic bd" title="Borrar" onclick="delTr('${t.id}')"><i class="ti ti-trash"></i></button>`:""}</div></div>
   <div style="display:flex;gap:4px;margin:16px 0">${ET.map((e,k)=>`<div onclick="setE('${t.id}','${e[0]}')" style="flex:1;cursor:pointer;text-align:center;font-size:11px"><div style="height:7px;border-radius:4px;background:${k<=ci?colr:"rgba(0,0,0,.1)"};margin-bottom:4px"></div><span style="color:${k==ci?"var(--tx)":"var(--tx3)"};font-weight:${k==ci?600:400}">${e[1]}</span></div>`).join("")}</div>
   ${ADM()?`<div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:12px"><div class="mt"><div class="l">Total</div><div style="font-weight:600">${money(fin(t).total)}</div></div><div class="mt"><div class="l">Pagado</div><div style="font-weight:600">${money(pagado(t))}</div></div><div class="mt"><div class="l">Saldo</div><div style="font-weight:600;color:${saldo(t)>0?"var(--ora-t)":"var(--ok)"}">${money(saldo(t))}</div></div></div>`:""}
+  ${falta(t).length?`<div class="sm" style="background:#FFF6F0;border:1px dashed var(--ora-t);color:#A4471A;padding:8px 12px;border-radius:8px;margin-bottom:6px"><i class="ti ti-pencil"></i> Falta completar: ${falta(t).join(", ")}. Tocá el lápiz para editar.</div>`:""}
   <span class="lb">Servicio contratado</span><div>${esc(t.servicio||"-")}</div>
   <span class="lb">Lo que se acordó</span><div style="background:var(--soft);padding:10px 12px;border-radius:8px;white-space:pre-wrap">${esc(t.acordado||"-")}</div>
   ${t.editadoPor?`<div class="sm muted" style="margin-top:10px"><i class="ti ti-history"></i> Última modificación: ${esc(t.editadoPor)}</div>`:""}
-  <div style="display:flex;gap:6px;margin-top:14px;flex-wrap:wrap">${ADM()?`<button onclick="formPago('${t.id}')"><i class="ti ti-cash"></i> Registrar pago</button>`:""}${ci<5?`<button class="bp" onclick="setE('${t.id}','${ET[ci+1][0]}')"><i class="ti ti-arrow-right"></i> Pasar a ${ET[ci+1][1]}</button>`:""}<button onclick="resumen('${t.id}')"><i class="ti ti-send"></i> Enviar resumen al cliente</button></div>
+  <div style="display:flex;gap:6px;margin-top:14px;flex-wrap:wrap">${ADM()?`<button onclick="formPago('${t.id}')"><i class="ti ti-cash"></i> Registrar pago</button>`:""}${ci<5?`<button class="bp" onclick="setE('${t.id}','${ET[ci+1][0]}')"><i class="ti ti-arrow-right"></i> Pasar a ${ET[ci+1][1]}</button>`:""}<button onclick="resumen('${t.id}')"><i class="ti ti-send"></i> Enviar resumen al cliente</button><button onclick="voz('${t.id}')"><i class="ti ti-microphone"></i> Agregar por voz</button></div>
   ${ADM()&&(fin(t).pagos||[]).length?`<span class="lb" style="margin-top:16px">Pagos</span>${fin(t).pagos.map((p,k)=>`<div class="row"><i class="ti ti-cash" style="color:var(--ok)"></i><div style="flex:1">${money(p.monto)} <span class="sm muted">${esc(p.nota||"")}</span></div><span class="sm muted">${fd(p.fecha)}</span><button class="ic" style="border:none" title="Quitar pago" onclick="delPago('${t.id}',${k})"><i class="ti ti-x" style="color:var(--tx3)"></i></button></div>`).join("")}`:""}
   <span class="lb" style="margin-top:16px">Tareas de este trabajo</span>${ts.map(taRow).join("")||'<div class="sm muted">Sin tareas.</div>'}
   <div style="display:flex;gap:6px;margin-top:10px"><input id="nt" placeholder="Ej: entregar fotos editadas"><input id="ntf" type="date" value="${hoy()}" style="max-width:160px"><button class="bp ic" onclick="addTa('${t.id}')"><i class="ti ti-plus"></i></button></div></div>`;
@@ -330,7 +347,7 @@ window.delPago=(id,k)=>{if(!ADM()||!confirm("¿Quitar este pago?"))return;const 
 
 /* ---------- MODALES ---------- */
 function modal(html){$("#modal").innerHTML=`<div class="ov" onclick="if(event.target===this)cerrar()"><div class="md">${html}</div></div>`;document.body.style.overflow="hidden";}
-window.cerrar=()=>{$("#modal").innerHTML="";document.body.style.overflow="";};
+window.cerrar=()=>{try{if(rec)rec.stop();}catch(e){}$("#modal").innerHTML="";document.body.style.overflow="";};
 const opts=(arr,sel)=>arr.map(o=>`<option ${o==sel?"selected":""}>${esc(o)}</option>`).join("");
 const head=t=>`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="font-size:17px;color:var(--deep)">${t}</b><button class="ic" style="border:none" onclick="cerrar()"><i class="ti ti-x"></i></button></div>`;
 
@@ -353,8 +370,7 @@ window.formTr=(id,clId)=>{
     const er=m=>{$("#fer").textContent=m;};let c=$("#fc").value;
     if(c=="new"){const n=$("#fcnn").value.trim();if(!n)return er("Ingresá el nombre del cliente");}
     else if(!c)return er("Elegí un cliente");
-    if(!$("#ff").value)return er("Elegí la fecha del trabajo");
-    $("#fok").disabled=true;
+        $("#fok").disabled=true;
     const ok=await guardar(async()=>{
       if(c=="new"){const d=await addDoc(col("clientes"),{nombre:$("#fcnn").value.trim(),telefono:$("#fcnt").value.trim(),origen:$("#fcno").value,instagram:"",notas:"",creado:serverTimestamp(),creadoPor:S.me.nombre,...firma()});c=d.id;}
       const data={clienteId:c,tipo:$("#ft").value,etapa:$("#fe").value,fecha:$("#ff").value,hora:$("#fh").value,lugar:$("#fl").value.trim(),servicio:$("#fp").value.trim(),acordado:$("#fa").value.trim(),...firma()};
@@ -403,6 +419,162 @@ window.resumen=id=>{
   if(wa)$("#rwa").onclick=()=>window.open(wa+"?text="+encodeURIComponent($("#rs").value),"_blank");
   $("#rcp").onclick=()=>{navigator.clipboard.writeText($("#rs").value).then(()=>toast("Copiado"));};
 };
+
+/* ---------- DICTADO POR VOZ + IA ---------- */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec=null;
+const DIAS=["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
+const ETK=ET.map(e=>e[0]).join(", ");
+window.voz=(trId)=>{
+  const t=trId?S.tr.find(x=>x.id==trId):null;
+  modal(`${head(t?"Agregar datos por voz":"Cargar trabajo por voz")}
+  ${t?`<div class="sm muted" style="margin-bottom:6px">${esc(cli(t.clienteId).nombre)} · ${esc(t.tipo)}. Decí solo lo nuevo o lo que cambia, por ejemplo: "la fiesta es el 20 de marzo a las 22 en Las Palmeras".</div>`:`<div class="sm muted" style="margin-bottom:6px">Contá lo que te pidió el cliente: nombre, evento, fecha, lugar, servicio y precio si ya lo hablaron.</div>`}
+  <button class="mic" id="micb" aria-label="Dictar"><i class="ti ti-microphone"></i></button>
+  <div id="mst" class="sm muted" style="text-align:center;margin-bottom:8px">${SR?"Tocá el micrófono y hablá":"Usá el micrófono del teclado para dictar"}</div>
+  <textarea id="vtx" rows="5" placeholder="Lo que dictes aparece acá. Podés corregirlo antes de procesar."></textarea>
+  <div class="err" id="ver"></div>
+  <button class="bp" id="vgo" style="width:100%;justify-content:center;padding:12px;margin-top:6px"><i class="ti ti-sparkles"></i> Procesar con IA</button>`);
+  const tx=$("#vtx"),st=$("#mst"),mb=$("#micb");tx.oninput=()=>$("#ver").textContent="";
+  mb.onclick=()=>{
+    if(!SR){tx.focus();return;}
+    if(rec){rec.stop();return;}
+    const base=tx.value?tx.value.trim()+" ":"";
+    rec=new SR();rec.lang="es-AR";rec.interimResults=true;rec.continuous=true;
+    rec.onresult=e=>{let s="";for(const r of e.results)s+=r[0].transcript;tx.value=base+s;};
+    rec.onstart=()=>{mb.classList.add("on");st.textContent="Escuchando... tocá de nuevo para terminar";};
+    rec.onend=()=>{rec=null;mb.classList.remove("on");st.textContent="Listo. Revisá el texto y procesalo.";};
+    rec.onerror=e=>{st.textContent=e.error=="not-allowed"?"Permití el micrófono en el navegador, o usá el del teclado.":"No se pudo usar el micrófono ("+e.error+").";};
+    try{rec.start();}catch(e){rec=null;}
+  };
+  $("#vgo").onclick=async()=>{
+    if(rec)rec.stop();
+    const txt=tx.value.trim();if(!txt){$("#ver").textContent="Dictá o escribí algo primero";return;}
+    const b=$("#vgo");b.disabled=true;b.innerHTML='<i class="ti ti-loader-2"></i> Procesando...';
+    try{const r=await pedirIA(t?promptUpd(txt,t):promptNuevo(txt));t?revisarUpd(r,t,txt):revisarNuevo(r,txt);}
+    catch(e){$("#ver").textContent=errIA(e);b.disabled=false;b.innerHTML='<i class="ti ti-sparkles"></i> Procesar con IA';}
+  };
+};
+function errIA(e){const m=String(e?.message||e);
+  if(/app.?check|appcheck|attestation/i.test(m))return "La IA todavía no está habilitada: falta la verificación de la app (App Check).";
+  if(/429|quota|exhausted|rate/i.test(m))return "Se alcanzó el límite gratuito de la IA por el momento. Probá en un rato.";
+  if(/network|fetch|offline/i.test(m))return "Sin conexión. Probá de nuevo cuando tengas señal.";
+  return "No se pudo procesar: "+m.slice(0,140);}
+async function pedirIA(prompt){
+  let last;
+  for(const model of MODELOS){
+    try{
+      const m=getGenerativeModel(ai,{model,generationConfig:{responseMimeType:"application/json",temperature:0.1}});
+      const r=await m.generateContent(prompt);let s=r.response.text().trim().replace(/^```(json)?/,"").replace(/```$/,"");
+      return JSON.parse(s);
+    }catch(e){last=e;if(!/not.?found|404|not supported|unsupported|no longer available|deprecated/i.test(String(e.message)))break;}
+  }
+  throw last;
+}
+const ctxHoy=()=>{const d=new Date();return `Hoy es ${DIAS[d.getDay()]} ${hoy()}.`;};
+const reglas=`Sos el asistente de un fotógrafo de eventos de Chaco, Argentina. Te paso un texto dictado por voz (puede tener errores de reconocimiento). Reglas:
+- Corregí errores típicos de dictado: teléfonos partidos o con palabras ("tres 725-4539 05" → "3725 45-3905"; códigos de área locales como 3725, 362, 3734), "foto libro" → "fotolibro", montos ("1 millón" → 1000000, "150 mil" o "150 lucas" → 150000).
+- Fechas relativas ("el sábado", "el próximo jueves", "el 12 de diciembre") resolvelas desde hoy. Si el día ya pasó este año, usá el año siguiente. "a la tarde" sin hora exacta → hora null.
+- NO inventes datos. Lo que no se menciona va en null.
+- Respondé SOLO con JSON válido, sin texto extra.`;
+function promptNuevo(txt){
+  const cls=S.cl.slice(0,300).map(c=>({id:c.id,nombre:c.nombre,telefono:c.telefono||""}));
+  return `${reglas}
+${ctxHoy()}
+Clientes ya cargados (si el dictado se refiere claramente a uno, por nombre o teléfono, devolvé su id en clienteExistenteId): ${JSON.stringify(cls)}
+Formato de respuesta:
+{"clienteExistenteId":string|null,
+ "cliente":{"nombre":"la persona del evento (ej. la quinceañera o los novios)"|null,"contacto":"quién habló si es otra persona (ej. 'Mamá de Camila')"|null,"telefono":string|null,"instagram":string|null,"origen":uno de ${JSON.stringify(ORIG)} o null},
+ "trabajo":{"tipo":uno de ${JSON.stringify(TIPOS)},"etapa":uno de [${ETK}] (consulta si solo preguntó; presupuesto si ya hay precio pero sin seña; senado si pagó seña),"fecha":"AAAA-MM-DD"|null,"hora":"HH:MM"|null,"lugar":string|null,"servicio":"todos los servicios pedidos, separados por ' + '"|null,"acordado":"resumen breve de lo acordado y pendientes"|null,"total":número|null,"sena":número|null},
+ "tarea":{"texto":"siguiente paso pendiente si se menciona (reunión, llamar, confirmar)","fecha":"AAAA-MM-DD (si no hay fecha, 3 días desde hoy)"}|null,
+ "correcciones":["frases cortas: 'lo dictado' → 'lo interpretado'"]}
+Texto dictado: """${txt}"""`;
+}
+function promptUpd(txt,t){
+  const c=cli(t.clienteId);
+  const actual={cliente:{nombre:c.nombre,telefono:c.telefono||null,instagram:c.instagram||null,origen:c.origen||null},trabajo:{tipo:t.tipo,etapa:t.etapa,fecha:t.fecha||null,hora:t.hora||null,lugar:t.lugar||null,servicio:t.servicio||null,acordado:t.acordado||null}};
+  return `${reglas}
+${ctxHoy()}
+Este es un trabajo ya cargado: ${JSON.stringify(actual)}
+El fotógrafo dictó datos nuevos o cambios. Devolvé SOLO los campos que cambian o se agregan.
+Si agrega información a "acordado" o "servicio", devolvé el texto completo actualizado (lo anterior más lo nuevo).
+Formato: {"cliente":{campos que cambian},"trabajo":{campos que cambian; también puede incluir "total" o "sena" (números) si se mencionan},"tarea":{"texto":string,"fecha":"AAAA-MM-DD"}|null,"correcciones":[string]}
+Texto dictado: """${txt}"""`;
+}
+const vf=(id,lab,val,inp)=>`<div><span class="lb">${lab}</span>${inp.replace("CLS",val===null||val===undefined||val===""?"fx":"iaok")}</div>`;
+function revisarNuevo(ia,txt){
+  const c=ia.cliente||{},w=ia.trabajo||{};const ex=ia.clienteExistenteId&&S.cl.find(x=>x.id==ia.clienteExistenteId);
+  const tipo=TIPOS.includes(w.tipo)?w.tipo:"Otro";const etapa=ET.some(e=>e[0]==w.etapa)?w.etapa:"consulta";
+  const clOpts=[...S.cl].sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(x=>`<option value="${x.id}" ${ex&&x.id==ex.id?"selected":""}>${esc(x.nombre)}</option>`).join("");
+  modal(`${head('<i class="ti ti-sparkles"></i> Revisá lo que entendió la IA')}
+  <div class="sm" style="display:flex;gap:12px;margin-bottom:4px"><span style="color:#5A1786"><i class="ti ti-check"></i> Detectado</span><span style="color:#A4471A"><i class="ti ti-pencil"></i> A completar</span></div>
+  <span class="lb">Cliente</span><select id="rc" class="iaok">${clOpts}<option value="new" ${ex?"":"selected"}>+ Cliente nuevo</option></select>
+  <div id="rcn" style="display:${ex?"none":"block"}"><div class="g2">
+  ${vf("rn","Nombre",c.nombre,`<input id="rn" class="CLS" value="${esc(c.nombre||"")}">`)}
+  ${vf("rt","Teléfono",c.telefono,`<input id="rt" type="tel" class="CLS" value="${esc(c.telefono||"")}">`)}
+  ${vf("ro","Cómo llegó",c.origen,`<select id="ro" class="CLS"><option value="">A completar</option>${opts(ORIG,c.origen)}</select>`)}
+  ${vf("ri","Instagram",c.instagram,`<input id="ri" class="CLS" value="${esc(c.instagram||"")}" placeholder="opcional">`)}
+  </div>${c.contacto?`<span class="lb">Contacto</span><input id="rk" class="iaok" value="${esc(c.contacto)}">`:'<input id="rk" type="hidden" value="">'}</div>
+  <div class="g2">
+  ${vf("rtp","Tipo de evento",w.tipo,`<select id="rtp" class="CLS">${opts(TIPOS,tipo)}</select>`)}
+  ${vf("ret","Etapa",w.etapa,`<select id="ret" class="CLS">${ET.map(e=>`<option value="${e[0]}" ${e[0]==etapa?"selected":""}>${e[1]}</option>`).join("")}</select>`)}
+  ${vf("rf","Fecha",w.fecha,`<input id="rf" type="date" class="CLS" value="${esc(w.fecha||"")}">`)}
+  ${vf("rh","Hora",w.hora,`<input id="rh" type="time" class="CLS" value="${esc(w.hora||"")}">`)}
+  ${ADM()?vf("rto","Total",w.total,`<input id="rto" type="number" inputmode="numeric" class="CLS" value="${w.total??""}">`)+vf("rse","Seña recibida",w.sena,`<input id="rse" type="number" inputmode="numeric" class="CLS" value="${w.sena??""}">`):""}
+  </div>
+  ${vf("rl","Lugar",w.lugar,`<input id="rl" class="CLS" value="${esc(w.lugar||"")}" placeholder="A completar">`)}
+  ${vf("rs","Servicio contratado",w.servicio,`<input id="rs" class="CLS" value="${esc(w.servicio||"")}">`)}
+  ${vf("ra","Lo que se acordó",w.acordado,`<textarea id="ra" rows="3" class="CLS">${esc(w.acordado||"")}</textarea>`)}
+  ${ia.tarea&&ia.tarea.texto?`<span class="lb"><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="rtk" checked style="width:auto"> Crear tarea</label></span><div style="display:flex;gap:6px"><input id="rtt" class="iaok" value="${esc(ia.tarea.texto)}"><input id="rtf" type="date" class="iaok" style="max-width:160px" value="${esc(ia.tarea.fecha||"")}"></div>`:""}
+  ${(ia.correcciones||[]).length?`<div class="mt sm" style="margin-top:12px;color:var(--tx2)"><b style="color:var(--deep)">Correcciones del dictado:</b> ${ia.correcciones.map(esc).join(" · ")}</div>`:""}
+  <details style="margin-top:10px"><summary class="sm muted" style="cursor:pointer">Ver lo que dictaste</summary><div class="sm muted" style="margin-top:6px;white-space:pre-wrap">${esc(txt)}</div></details>
+  <div class="err" id="rer"></div>
+  <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap"><button class="bp" id="rok"><i class="ti ti-check"></i> Guardar</button><button onclick="voz()"><i class="ti ti-microphone"></i> Volver a dictar</button></div>`);
+  document.querySelectorAll(".md .fx,.md .iaok").forEach(el=>el.addEventListener("input",()=>{el.classList.remove("fx");el.classList.remove("iaok");}));
+  $("#rc").onchange=e=>$("#rcn").style.display=e.target.value=="new"?"block":"none";
+  $("#rok").onclick=async()=>{
+    let cid=$("#rc").value;const er=m=>$("#rer").textContent=m;
+    if(cid=="new"&&!$("#rn").value.trim())return er("Falta el nombre del cliente");
+    $("#rok").disabled=true;
+    const ok=await guardar(async()=>{
+      if(cid=="new"){const k=$("#rk").value.trim();const d=await addDoc(col("clientes"),{nombre:$("#rn").value.trim(),telefono:$("#rt").value.trim(),instagram:$("#ri").value.trim(),origen:$("#ro").value,notas:k?"Contacto: "+k:"",creado:serverTimestamp(),creadoPor:S.me.nombre,...firma()});cid=d.id;}
+      const data={clienteId:cid,tipo:$("#rtp").value,etapa:$("#ret").value,fecha:$("#rf").value,hora:$("#rh").value,lugar:$("#rl").value.trim(),servicio:$("#rs").value.trim(),acordado:$("#ra").value.trim(),origenCarga:"voz",creado:serverTimestamp(),creadoPor:S.me.nombre,...firma()};
+      const sen=ADM()?(+$("#rse").value||0):0;if(sen>0&&(data.etapa=="consulta"||data.etapa=="presupuesto"))data.etapa="senado";
+      const d=await addDoc(col("trabajos"),data);S.sel=d.id;
+      if(ADM())await setDoc(dref("finanzas",d.id),{total:+$("#rto").value||0,pagos:sen>0?[{monto:sen,fecha:hoy(),nota:"Seña"}]:[]});
+      if($("#rtk")&&$("#rtk").checked&&$("#rtt").value.trim())await addDoc(col("tareas"),{texto:$("#rtt").value.trim(),fecha:$("#rtf").value||hoy(),hecha:false,trabajoId:d.id,creado:serverTimestamp()});
+    },"Trabajo guardado");
+    if(ok){cerrar();S.tab="detalle";r();window.scrollTo(0,0);}else $("#rok").disabled=false;
+  };
+}
+const LAB={nombre:"Nombre",telefono:"Teléfono",instagram:"Instagram",origen:"Cómo llegó",tipo:"Tipo de evento",etapa:"Etapa",fecha:"Fecha",hora:"Hora",lugar:"Lugar",servicio:"Servicio",acordado:"Lo acordado",total:"Total",sena:"Seña"};
+function revisarUpd(ia,t,txt){
+  const c=cli(t.clienteId);const cam=[];
+  const okC=["nombre","telefono","instagram","origen"],okT=["tipo","etapa","fecha","hora","lugar","servicio","acordado"].concat(ADM()?["total","sena"]:[]);
+  Object.entries(ia.cliente||{}).forEach(([k,v])=>{if(okC.includes(k)&&v!==null&&v!==""&&v!=c[k])cam.push({o:"cliente",k,antes:c[k],v});});
+  Object.entries(ia.trabajo||{}).forEach(([k,v])=>{if(!okT.includes(k)||v===null||v==="")return;if(k=="etapa"&&!ET.some(e=>e[0]==v))return;
+    const antes=k=="total"?fin(t).total:k=="sena"?null:t[k];if(v!=antes)cam.push({o:"trabajo",k,antes,v});});
+  const sh=(k,v)=>v===null||v===undefined||v===""?'<span class="muted">vacío</span>':k=="etapa"?esc(et(v)[1]):k=="fecha"?fd(v):(k=="total"||k=="sena")?money(v):esc(v);
+  if(!cam.length&&!(ia.tarea&&ia.tarea.texto)){$("#ver").textContent="No encontré datos nuevos en lo que dictaste. Probá decirlo de otra forma.";$("#vgo").disabled=false;$("#vgo").innerHTML='<i class="ti ti-sparkles"></i> Procesar con IA';return;}
+  modal(`${head('<i class="ti ti-sparkles"></i> Cambios detectados')}
+  <div class="sm muted" style="margin-bottom:6px">${esc(c.nombre)} · ${esc(t.tipo)}. Destildá lo que no quieras aplicar.</div>
+  ${cam.map((x,i)=>`<label class="row" style="align-items:flex-start;cursor:pointer"><input type="checkbox" class="cx" data-i="${i}" checked style="width:18px;height:18px;margin-top:2px"><div style="flex:1;min-width:0"><div class="sm" style="font-weight:600">${LAB[x.k]||x.k}${x.k=="sena"?" (se registra como pago)":""}</div><div class="sm"><span style="text-decoration:line-through;color:var(--tx3)">${sh(x.k,x.antes)}</span> → <b style="color:var(--deep)">${sh(x.k,x.v)}</b></div></div></label>`).join("")}
+  ${ia.tarea&&ia.tarea.texto?`<label class="row" style="cursor:pointer"><input type="checkbox" id="utk" checked style="width:18px;height:18px"><div class="sm" style="flex:1"><b>Nueva tarea:</b> ${esc(ia.tarea.texto)} · ${fd(ia.tarea.fecha||hoy())}</div></label>`:""}
+  ${(ia.correcciones||[]).length?`<div class="mt sm" style="margin-top:10px;color:var(--tx2)"><b style="color:var(--deep)">Correcciones:</b> ${ia.correcciones.map(esc).join(" · ")}</div>`:""}
+  <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap"><button class="bp" id="uok"><i class="ti ti-check"></i> Aplicar cambios</button><button onclick="voz('${t.id}')"><i class="ti ti-microphone"></i> Volver a dictar</button></div>`);
+  $("#uok").onclick=async()=>{
+    const sel=[...document.querySelectorAll(".cx")].filter(x=>x.checked).map(x=>cam[+x.dataset.i]);
+    const uc={},ut={};let total=null,sena=null;
+    sel.forEach(x=>{if(x.o=="cliente")uc[x.k]=x.v;else if(x.k=="total")total=+x.v||0;else if(x.k=="sena")sena=+x.v||0;else ut[x.k]=x.v;});
+    if(sena>0&&(t.etapa=="consulta"||t.etapa=="presupuesto")&&!ut.etapa)ut.etapa="senado";
+    $("#uok").disabled=true;
+    const ok=await guardar(async()=>{
+      if(Object.keys(uc).length)await updateDoc(dref("clientes",c.id),{...uc,...firma()});
+      if(Object.keys(ut).length)await updateDoc(dref("trabajos",t.id),{...ut,...firma()});
+      if(ADM()&&(total!==null||sena)){const f={};if(total!==null)f.total=total;if(sena)f.pagos=[...(fin(t).pagos||[]),{monto:sena,fecha:hoy(),nota:"Seña"}];await setDoc(dref("finanzas",t.id),f,{merge:true});}
+      if($("#utk")&&$("#utk").checked)await addDoc(col("tareas"),{texto:ia.tarea.texto,fecha:ia.tarea.fecha||hoy(),hecha:false,trabajoId:t.id,creado:serverTimestamp()});
+    },"Cambios aplicados");
+    if(ok)cerrar();else $("#uok").disabled=false;
+  };
+}
 
 /* ---------- BACKUP ---------- */
 $("#bkbtn").onclick=()=>{
