@@ -81,6 +81,7 @@ header img{height:38px}
     <img src="logo.png" alt="Gustavo Torres Fotografías">
     <div style="display:flex;gap:6px;align-items:center">
       <input id="q" placeholder="Buscar cliente o trabajo" style="max-width:220px;padding:8px 10px">
+      <button class="ic" id="avbtn" title="Notificaciones" onclick="avisos()"><i class="ti ti-bell"></i></button>
       <button class="ic" id="bkbtn" title="Descargar backup en Excel"><i class="ti ti-download"></i><span class="hdtx">Backup</span></button>
       <span id="who" class="sm muted" style="display:flex;align-items:center;gap:4px"></span>
       <button class="ic" id="outbtn" title="Cerrar sesión"><i class="ti ti-logout"></i></button>
@@ -94,7 +95,8 @@ header img{height:38px}
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, createUserWithEmailAndPassword, inMemoryPersistence } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-auth.js";
-import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, setDoc, getDoc, getDocs, onSnapshot, serverTimestamp, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-firestore.js";
+import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, setDoc, getDoc, getDocs, onSnapshot, serverTimestamp, enableIndexedDbPersistence, arrayUnion } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-firestore.js";
+import { getMessaging, getToken, isSupported as msgSoportado, onMessage } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-messaging.js";
 import { getAI, getGenerativeModel, GoogleAIBackend } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-ai.js";
 import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-app-check.js";
 
@@ -107,7 +109,7 @@ const firebaseConfig = {
   appId: "1:73327030013:web:e7d881788da3ba4c43d894"
 };
 const RECAPTCHA_SITE_KEY = "PEGAR_CLAVE_DEL_SITIO";
-const MODELOS = ["gemini-3.6-flash","gemini-2.5-flash","gemini-2.5-flash-lite"];
+const MODELOS = ["gemini-2.5-flash","gemini-3.6-flash","gemini-2.5-flash-lite","gemini-2.0-flash"];
 const fb = initializeApp(firebaseConfig);
 try { if(!RECAPTCHA_SITE_KEY.startsWith("PEGAR")) initializeAppCheck(fb,{provider:new ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),isTokenAutoRefreshEnabled:true}); } catch(e) { console.warn("App Check",e); }
 const auth = getAuth(fb);
@@ -174,6 +176,8 @@ onAuthStateChanged(auth,async u=>{
   $("#loading").classList.add("hide");$("#login").classList.add("hide");$("#app").classList.remove("hide");
   $("#bkbtn").classList.toggle("hide",!ADM());
   $("#who").innerHTML=`<i class="ti ti-user-circle"></i><span class="hdtx">${esc(S.me.nombre)}${ADM()?"":" · Secretario/a"}</span>`;
+  marcarCampana();
+  msgSoportado().then(ok=>{if(ok){msg=msg||getMessaging(fb);onMessage(msg,p=>toast((p.notification?.title||"Aviso")+": "+(p.notification?.body||"").split("\n")[0]));}}).catch(()=>{});
   if(ADM())await migrar();
   const sub=(n,k)=>unsubs.push(onSnapshot(col(n),s=>{S[k]=s.docs.map(d=>({id:d.id,...d.data()}));r();},e=>toast("Error de conexión: "+e.code)));
   sub("clientes","cl");sub("trabajos","tr");sub("tareas","ta");
@@ -296,15 +300,59 @@ window.S_ta=v=>{S.filtroTa=v;r();};
 function equipo(){
   const l=[...S.miembros].sort((a,b)=>(a.rol=="admin"?-1:1)-(b.rol=="admin"?-1:1)||String(a.nombre).localeCompare(String(b.nombre)));
   return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px"><span class="muted sm">Quiénes pueden entrar a la app</span><button class="bp" onclick="formMiembro()"><i class="ti ti-user-plus"></i> Agregar secretario/a</button></div>
-  <div class="cd">${l.map(m=>`<div class="row"><div class="av" style="background:${m.rol=="admin"?"var(--deep)":avc(m.id)}">${esc(iniciales(m.nombre))}</div><div style="flex:1;min-width:0"><div style="font-weight:600">${esc(m.nombre)} ${m.rol=="admin"?pill("Administrador","deep"):pill("Secretario/a","vio")}</div><div class="sm muted">${esc(m.email||"")}</div></div>${m.rol=="admin"?"":m.activo?`<span class="sm" style="color:var(--ok)">Activo</span><button onclick="setActivo('${m.id}',false)">Desactivar</button>`:`<span class="sm muted">Desactivado</span><button onclick="setActivo('${m.id}',true)">Activar</button>`}</div>`).join("")}</div>
+  <div class="cd">${l.map(m=>`<div class="row"><div class="av" style="background:${m.rol=="admin"?"var(--deep)":avc(m.id)}">${esc(iniciales(m.nombre))}</div><div style="flex:1;min-width:0"><div style="font-weight:600">${esc(m.nombre)} ${m.rol=="admin"?pill("Administrador","deep"):pill("Secretario/a","vio")}</div><div class="sm muted">${esc(m.email||"")}${m.telefono?" · "+esc(m.telefono):""} · ${(m.tokens||[]).length?'<span style="color:var(--ok)"><i class="ti ti-bell"></i> avisos activos</span>':'<span class="muted"><i class="ti ti-bell-off"></i> sin avisos</span>'}</div></div>${m.rol!="admin"&&m.telefono?`<button class="ic" title="Mandar resumen de la semana por WhatsApp" onclick="resumenWa('${m.id}')"><i class="ti ti-brand-whatsapp" style="color:#1d9e55"></i></button>`:""}${m.rol!="admin"?`<button class="ic" title="Editar" onclick="editMiembro('${m.id}')"><i class="ti ti-edit"></i></button>`:""}${m.rol=="admin"?"":m.activo?`<span class="sm" style="color:var(--ok)">Activo</span><button onclick="setActivo('${m.id}',false)">Desactivar</button>`:`<span class="sm muted">Desactivado</span><button onclick="setActivo('${m.id}',true)">Activar</button>`}</div>`).join("")}</div>
+  <div class="cd" style="margin-top:12px"><b><i class="ti ti-bell"></i> Avisos automáticos</b><div class="sm muted" style="margin:4px 0 10px">Todos los días a la mañana llega el aviso de lo que hay al día siguiente, y los lunes el repaso de la semana. Les llegan a vos y a los secretarios que activaron los avisos, sin montos.</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button onclick="probarAviso('manana')"><i class="ti ti-send"></i> Probar aviso de mañana</button><button onclick="probarAviso('lunes')"><i class="ti ti-send"></i> Probar repaso del lunes</button></div><div class="sm muted" style="margin-top:6px">Las pruebas te llegan solo a vos.</div></div>
   <div class="mt" style="margin-top:12px;font-size:13px;color:var(--tx2)"><i class="ti ti-lock"></i> Los secretarios ven y editan clientes, trabajos, etapas, agenda y tareas. No ven totales, señas, pagos ni saldos, y no pueden borrar trabajos ni clientes ni descargar el backup.</div>`;
 }
 window.setActivo=(uid,v)=>{if(!v&&!confirm("¿Desactivar este acceso? No va a poder entrar más hasta que lo vuelvas a activar."))return;guardar(()=>updateDoc(dref("miembros",uid),{activo:v}),v?"Acceso activado":"Acceso desactivado");};
+window.editMiembro=id=>{const m=S.miembros.find(x=>x.id==id);
+  modal(`${head("Editar "+esc(m.nombre))}<span class="lb">Nombre</span><input id="en" value="${esc(m.nombre)}"><span class="lb">WhatsApp</span><input id="et" type="tel" value="${esc(m.telefono||"")}" placeholder="3725 40-0000"><div class="err" id="eer"></div><div style="display:flex;gap:6px;margin-top:10px"><button class="bp" id="eok"><i class="ti ti-check"></i> Guardar</button><button onclick="cerrar()">Cancelar</button></div>`);
+  $("#eok").onclick=async()=>{const n=$("#en").value.trim();if(!n){$("#eer").textContent="Ingresá el nombre";return;}if(await guardar(()=>updateDoc(dref("miembros",id),{nombre:n,telefono:$("#et").value.trim()}),"Guardado"))cerrar();};};
+function textoSemana(nombre){
+  const H=hoy();const fin=new Date();fin.setDate(fin.getDate()+6);const F=fin.getFullYear()+"-"+String(fin.getMonth()+1).padStart(2,"0")+"-"+String(fin.getDate()).padStart(2,"0");
+  const sem=S.tr.filter(t=>t.fecha&&t.fecha>=H&&t.fecha<=F).sort((a,b)=>(a.fecha+a.hora).localeCompare(b.fecha+b.hora));
+  const pend=S.ta.filter(t=>!t.hecha).sort((a,b)=>String(a.fecha||"9").localeCompare(String(b.fecha||"9")));
+  const venc=pend.filter(t=>t.fecha&&t.fecha<H);const inc=S.tr.filter(t=>t.etapa!="entregado"&&falta(t).length);const ed=S.tr.filter(t=>t.etapa=="sesion"||t.etapa=="edicion");
+  let s=`Hola ${nombre.split(" ")[0]}! Resumen de la semana 📸\n\n`;
+  s+=sem.length?`*Trabajos de la semana*\n${sem.map(t=>`• ${fd(t.fecha)} ${t.hora||""} · ${t.tipo} · ${cli(t.clienteId).nombre}${t.lugar?" · "+t.lugar:""}`).join("\n")}\n\n`:"Sin trabajos agendados esta semana.\n\n";
+  if(ed.length)s+=`*Por editar o entregar (${ed.length})*\n${ed.map(t=>`• ${cli(t.clienteId).nombre} · ${t.tipo}`).join("\n")}\n\n`;
+  s+=`*Tareas pendientes (${pend.length}${venc.length?`, ${venc.length} vencidas`:""})*\n${pend.slice(0,12).map(t=>`• ${t.texto}${t.fecha?" ("+fd(t.fecha)+")":""}`).join("\n")||"Ninguna"}\n`;
+  if(inc.length)s+=`\n*Datos a completar*\n${inc.map(t=>`• ${cli(t.clienteId).nombre} · ${t.tipo}: falta ${falta(t).join(", ")}`).join("\n")}\n`;
+  return s+"\nGustavo Torres Fotografías";
+}
+window.resumenWa=id=>{const m=S.miembros.find(x=>x.id==id);const wa=waLink(m.telefono);
+  modal(`${head("Resumen para "+esc(m.nombre))}<textarea id="rsw" rows="14">${esc(textoSemana(m.nombre))}</textarea><div style="display:flex;gap:6px;margin-top:10px"><button class="bp" id="rwg"><i class="ti ti-brand-whatsapp"></i> Enviar por WhatsApp</button><button onclick="cerrar()">Cerrar</button></div>`);
+  $("#rwg").onclick=()=>window.open(wa+"?text="+encodeURIComponent($("#rsw").value),"_blank");};
+window.probarAviso=async tipo=>{
+  try{const tk=await auth.currentUser.getIdToken();const r=await fetch("/api/cron?forzar="+tipo,{headers:{Authorization:"Bearer "+tk}});const j=await r.json().catch(()=>({}));
+    if(!r.ok)return toast("No se pudo: "+(j.error||r.status));const n=(j.enviados||[]).reduce((s,x)=>s+x.n,0);
+    toast(n?"Aviso enviado a "+n+" dispositivo(s)":"No hay dispositivos con avisos activos. Tocá la campanita primero.");
+  }catch(e){toast("No se pudo: "+e.message);}};
+let msg=null;
+window.avisos=async()=>{
+  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);const standalone=window.matchMedia("(display-mode: standalone)").matches||navigator.standalone;
+  if(!("Notification" in window)||!(await msgSoportado().catch(()=>false))){
+    modal(`${head("Activar avisos")}${ios&&!standalone?`<p>En iPhone, los avisos funcionan solo si la app está instalada en la pantalla de inicio:</p><ol style="padding-left:20px;line-height:1.8"><li>Abrí esta página en <b>Safari</b>.</li><li>Tocá el botón <b>Compartir</b> <i class="ti ti-share"></i>.</li><li>Elegí <b>"Agregar a pantalla de inicio"</b>.</li><li>Abrí la app desde el ícono nuevo y tocá otra vez la campanita.</li></ol>`:"<p>Este navegador no permite notificaciones. Probá con Chrome o instalá la app en la pantalla de inicio.</p>"}<button onclick="cerrar()">Entendido</button>`);return;}
+  try{
+    const perm=await Notification.requestPermission();
+    if(perm!=="granted"){toast("Permiso de notificaciones rechazado. Activalo en los ajustes del navegador.");return;}
+    const cfg=await fetch("/api/config").then(r=>r.json()).catch(()=>({}));
+    if(!cfg.vapidKey){toast("Falta configurar la clave de avisos (VAPID) en Vercel");return;}
+    const reg=await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+    msg=msg||getMessaging(fb);
+    const token=await getToken(msg,{vapidKey:cfg.vapidKey,serviceWorkerRegistration:reg});
+    if(!token){toast("No se pudo obtener el permiso del dispositivo");return;}
+    await updateDoc(dref("miembros",U.uid),{tokens:arrayUnion(token)});
+    localStorage.setItem("gt_avisos","1");marcarCampana();toast("Avisos activados en este dispositivo");
+  }catch(e){toast("No se pudieron activar: "+(e.code||e.message));}
+};
+function marcarCampana(){const b=$("#avbtn");if(!b)return;let on=false;try{on=Notification.permission==="granted"&&localStorage.getItem("gt_avisos")==="1";}catch(e){}b.innerHTML=on?'<i class="ti ti-bell-ringing" style="color:var(--mag)"></i>':'<i class="ti ti-bell"></i>';b.title=on?"Avisos activados":"Activar avisos";}
 let auth2=null;
 window.formMiembro=()=>{
   modal(`${head("Agregar secretario/a")}
   <span class="lb">Nombre</span><input id="mn" placeholder="Laura">
   <span class="lb">Email para entrar</span><input id="me" type="email" placeholder="laura@gmail.com" autocomplete="off">
+  <span class="lb">WhatsApp (opcional, para mandarle el resumen semanal)</span><input id="mt" type="tel" placeholder="3725 40-0000">
   <span class="lb">Contraseña (mínimo 6 caracteres)</span><input id="mp" type="text" autocomplete="off" placeholder="Pasásela a la persona">
   <div class="err" id="mer"></div>
   <div style="display:flex;gap:6px;margin-top:10px"><button class="bp" id="mok"><i class="ti ti-check"></i> Crear acceso</button><button onclick="cerrar()">Cancelar</button></div>`);
@@ -315,7 +363,7 @@ window.formMiembro=()=>{
     try{
       if(!auth2){auth2=getAuth(initializeApp(firebaseConfig,"altas"));await setPersistence(auth2,inMemoryPersistence);}
       const cred=await createUserWithEmailAndPassword(auth2,em,pw);const uid=cred.user.uid;await signOut(auth2);
-      await setDoc(dref("miembros",uid),{nombre:n,email:em,rol:"secretario",activo:true,creado:serverTimestamp()});
+      await setDoc(dref("miembros",uid),{nombre:n,email:em,telefono:$("#mt").value.trim(),rol:"secretario",activo:true,creado:serverTimestamp()});
       cerrar();toast("Acceso creado para "+n);
     }catch(e){
       const msg={"auth/email-already-in-use":"Ese email ya tiene una cuenta","auth/invalid-email":"El email no es válido","auth/weak-password":"La contraseña es muy débil"}[e.code]||("No se pudo crear: "+(e.code||e.message));
@@ -450,24 +498,33 @@ window.voz=(trId)=>{
     const txt=tx.value.trim();if(!txt){$("#ver").textContent="Dictá o escribí algo primero";return;}
     const b=$("#vgo");b.disabled=true;b.innerHTML='<i class="ti ti-loader-2"></i> Procesando...';
     try{const r=await pedirIA(t?promptUpd(txt,t):promptNuevo(txt));t?revisarUpd(r,t,txt):revisarNuevo(r,txt);}
-    catch(e){$("#ver").textContent=errIA(e);b.disabled=false;b.innerHTML='<i class="ti ti-sparkles"></i> Procesar con IA';}
+    catch(e){errIA(e);b.disabled=false;b.innerHTML='<i class="ti ti-sparkles"></i> Procesar con IA';}
   };
 };
-function errIA(e){const m=String(e?.message||e);
-  if(/app.?check|appcheck|attestation/i.test(m))return "La IA todavía no está habilitada: falta la verificación de la app (App Check).";
-  if(/429|quota|exhausted|rate/i.test(m))return "Se alcanzó el límite gratuito de la IA por el momento. Probá en un rato.";
-  if(/network|fetch|offline/i.test(m))return "Sin conexión. Probá de nuevo cuando tengas señal.";
-  return "No se pudo procesar: "+m.slice(0,140);}
+function errIA(e){const m=String(e?.message||e);const det=`<details style="margin-top:4px"><summary class="sm" style="cursor:pointer">Detalle técnico</summary><div class="sm" style="white-space:pre-wrap;word-break:break-word;color:var(--tx2)">${esc((e?.intentos||[m]).join("\n\n").slice(0,900))}</div></details>`;
+  let msg="No se pudo procesar.";
+  if(/app.?check|attestation/i.test(m))msg="La IA rechazó el pedido por la verificación de la app (App Check). Puede tardar unos minutos en aplicarse el cambio.";
+  else if(/\b429\b|quota|RESOURCE_EXHAUSTED|rate.?limit/i.test(m))msg="Se alcanzó el límite gratuito de la IA por el momento. Probá en un rato.";
+  else if(/\b403\b|permission|API key|not been used|disabled/i.test(m))msg="Google rechazó el pedido (permisos o API desactivada).";
+  else if(/Failed to fetch|NetworkError|offline/i.test(m))msg="Sin conexión. Probá de nuevo cuando tengas señal.";
+  $("#ver").innerHTML=esc(msg)+det;return null;}
 async function pedirIA(prompt){
-  let last;
+  const intentos=[];
+  try{
+    const tk=await auth.currentUser.getIdToken();
+    const r=await fetch("/api/ia",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+tk},body:JSON.stringify({prompt})});
+    const j=await r.json().catch(()=>({}));
+    if(r.ok&&j.ok)return j.data;
+    intentos.push("servidor: ["+r.status+"] "+(j.error||"")+(j.intentos?" → "+j.intentos.join(" | "):""));
+  }catch(e){intentos.push("servidor: "+String(e?.message||e));}
   for(const model of MODELOS){
     try{
       const m=getGenerativeModel(ai,{model,generationConfig:{responseMimeType:"application/json",temperature:0.1}});
       const r=await m.generateContent(prompt);let s=r.response.text().trim().replace(/^```(json)?/,"").replace(/```$/,"");
       return JSON.parse(s);
-    }catch(e){last=e;if(!/not.?found|404|not supported|unsupported|no longer available|deprecated/i.test(String(e.message)))break;}
+    }catch(e){intentos.push(model+": "+String(e?.message||e));}
   }
-  throw last;
+  const err=new Error(intentos.join(" | "));err.intentos=intentos;throw err;
 }
 const ctxHoy=()=>{const d=new Date();return `Hoy es ${DIAS[d.getDay()]} ${hoy()}.`;};
 const reglas=`Sos el asistente de un fotógrafo de eventos de Chaco, Argentina. Te paso un texto dictado por voz (puede tener errores de reconocimiento). Reglas:
