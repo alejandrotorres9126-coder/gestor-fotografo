@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == "alejandrotorres91.26@gmail.com";
+    }
+    function isMember() {
+      return request.auth != null && (
+        isAdmin() ||
+        (exists(/databases/$(database)/documents/miembros/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/miembros/$(request.auth.uid)).data.activo == true)
+      );
+    }
+    function sinMontos() {
+      return !request.resource.data.keys().hasAny(['total', 'pagos', 'sena', 'monto']);
+    }
+
+    match /miembros/{uid} {
+      allow read: if isAdmin() || (request.auth != null && request.auth.uid == uid);
+      allow write: if isAdmin();
+      // cada uno puede guardar solo sus dispositivos para recibir avisos
+      allow update: if isMember() && request.auth.uid == uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tokens']);
+    }
+    match /clientes/{id} {
+      allow read, create, update: if isMember();
+      allow delete: if isAdmin();
+    }
+    match /trabajos/{id} {
+      allow read: if isMember();
+      allow create, update: if isMember() && sinMontos();
+      allow delete: if isAdmin();
+    }
+    match /tareas/{id} {
+      allow read, write: if isMember();
+    }
+    match /finanzas/{id} {
+      allow read, write: if isAdmin();
+    }
+    match /galerias/{id} {
+      allow read, write: if isAdmin();
+    }
+    match /config/{id} {
+      allow read, write: if isAdmin();
+    }
+    match /usuarios/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}

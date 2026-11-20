@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tus fotos · Gustavo Torres Fotografías</title>
+<link rel="icon" href="/favicon.png">
+<meta name="theme-color" content="#2a1d3d">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&family=Playfair+Display:ital,wght@0,500;1,400&display=swap" rel="stylesheet">
+<style>
+:root{--deep:#492D77;--mag:#BB1E9F;--vio:#6F1DA3;--ora:#FF7F40;--tx:#1f1e1d;--tx2:#5f5e5a;--bd:rgba(0,0,0,.1)}
+*{box-sizing:border-box}
+html,body{margin:0;background:#fff;color:var(--tx);font-family:Montserrat,system-ui,sans-serif;color-scheme:light}
+button{font-family:inherit;cursor:pointer;border:1px solid rgba(0,0,0,.18);background:#fff;color:var(--tx);border-radius:999px;padding:9px 16px;font-size:13px;display:inline-flex;align-items:center;gap:6px}
+button.bp{background:var(--deep);color:#fff;border-color:var(--deep)}
+.serif{font-family:"Playfair Display",Georgia,serif}
+header{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;max-width:1300px;margin:0 auto}
+header img{height:36px}
+.hero{position:relative;height:62vh;min-height:340px;max-height:620px;background:#2a1d3d center/cover no-repeat;display:flex;align-items:flex-end}
+.hero:after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(20,10,30,.78),rgba(20,10,30,.08) 60%)}
+.hero .in{position:relative;z-index:1;color:#fff;padding:28px 24px;max-width:1300px;margin:0 auto;width:100%}
+.hero .k{font-size:12px;letter-spacing:3px;opacity:.9;text-transform:uppercase}
+.hero h1{font-size:clamp(34px,6vw,60px);font-weight:500;margin:6px 0 4px}
+.wrap{max-width:1300px;margin:0 auto;padding:0 16px}
+.msg{text-align:center;font-size:clamp(16px,2.2vw,20px);font-style:italic;color:var(--tx2);max-width:760px;margin:30px auto 8px;line-height:1.6}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:18px 0 14px;position:sticky;top:0;background:#fff;z-index:5}
+.tabs{display:flex;gap:4px;flex-wrap:wrap}
+.tabs button{border:none;padding:8px 14px;color:var(--tx2)}
+.tabs button.on{background:var(--deep);color:#fff}
+.nota{font-size:13px;padding:10px 14px;border-radius:12px;margin-bottom:14px;display:flex;gap:8px;align-items:center}
+.grid{columns:4 240px;column-gap:10px}
+.ph{break-inside:avoid;margin-bottom:10px;position:relative;border-radius:6px;overflow:hidden;background:#efedf3;cursor:zoom-in}
+.ph img{width:100%;height:100%;display:block;object-fit:cover;opacity:0;transition:opacity .4s}
+.ph img.ok{opacity:1}
+.ph .hz{position:absolute;top:8px;right:8px;width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.92);color:var(--mag);display:flex;align-items:center;justify-content:center;font-size:16px}
+.lb{position:fixed;inset:0;background:#0f0b14;z-index:50;display:none;flex-direction:column}
+.lb.on{display:flex}
+.lb .top{display:flex;justify-content:space-between;align-items:center;color:#fff;padding:12px 16px;font-size:13px}
+.lb .st{flex:1;display:flex;align-items:center;justify-content:center;position:relative;min-height:0;touch-action:pan-y}
+.lb .st img{max-width:100%;max-height:100%;object-fit:contain;user-select:none;-webkit-user-drag:none}
+.lb .nav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.12);color:#fff;border:none;width:46px;height:46px;justify-content:center;padding:0;font-size:22px}
+.lb .bot{display:flex;justify-content:center;gap:8px;padding:12px 16px 18px;flex-wrap:wrap}
+.lb .bot button{background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.25)}
+.lb .bot button.fav{background:var(--mag);border-color:var(--mag)}
+footer{text-align:center;padding:40px 16px 50px;color:var(--tx2);font-size:13px;border-top:1px solid var(--bd);margin-top:30px}
+footer a{color:var(--mag);text-decoration:none;font-weight:600}
+.center{min-height:80vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
+.center input{font-family:inherit;font-size:22px;letter-spacing:8px;text-align:center;padding:12px;border:1px solid rgba(0,0,0,.2);border-radius:12px;width:200px;margin:14px 0 8px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--deep);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:60}
+.sk{height:220px}
+.noimg{-webkit-touch-callout:none}
+@media(max-width:640px){.grid{columns:2;column-gap:6px}.ph{margin-bottom:6px}.hero{height:52vh;min-height:300px}header img{height:30px}}
+</style>
+</head>
+<body>
+<div id="app"><div class="center"><img src="/logo.png" alt="Gustavo Torres Fotografías" style="width:260px;max-width:80%"><p style="color:#5f5e5a;margin-top:18px">Cargando tus fotos…</p></div></div>
+<div class="lb" id="lb">
+  <div class="top"><span id="lbt"></span><button id="lbx" style="background:transparent;color:#fff;border:none;font-size:22px" aria-label="Cerrar"><i class="ti ti-x"></i></button></div>
+  <div class="st" id="lbs"><button class="nav" id="lbp" style="left:12px" aria-label="Anterior"><i class="ti ti-chevron-left"></i></button><img id="lbi" alt=""><button class="nav" id="lbn" style="right:12px" aria-label="Siguiente"><i class="ti ti-chevron-right"></i></button></div>
+  <div class="bot"><button id="lbf"><i class="ti ti-heart"></i> Favorita</button><button id="lbd"><i class="ti ti-download"></i> Descargar</button></div>
+</div>
+<script>
+const slug=(location.pathname.split("/g/")[1]||new URLSearchParams(location.search).get("g")||"").replace(/\/.*$/,"");
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const toast=m=>{const d=document.createElement("div");d.className="toast";d.textContent=m;document.body.appendChild(d);setTimeout(()=>d.remove(),2600);};
+let G=null,tab="Todas",lista=[],cur=0,favs=new Set();
+const url=(id,s)=>`/api/foto?g=${slug}&id=${id}&s=${s}&k=${G.k}&m=${G.modo}&v=${G.v}`;
+
+async function cargar(pin){
+  if(!slug){fin("No encontramos esta galería","Revisá el link que te mandaron.");return;}
+  pin=pin??sessionStorage.getItem("pin_"+slug)??"";
+  let r,j;
+  try{r=await fetch(`/api/galeria?g=${slug}&pin=${encodeURIComponent(pin)}`);j=await r.json();}catch(e){fin("Sin conexión","Revisá tu internet y volvé a intentar.");return;}
+  if(r.status===401&&j.pin)return pedirPin(j);
+  if(!r.ok)return fin(j.error||"No disponible",r.status===410?"Si necesitás tus fotos, escribinos.":"Revisá el link que te mandaron.");
+  if(pin)sessionStorage.setItem("pin_"+slug,pin);
+  G=j;let loc=[];try{loc=JSON.parse(localStorage.getItem("fav_"+slug)||"[]");}catch(e){}
+  favs=new Set([...(G.favoritos||[]),...loc]);
+  document.title=`${G.titulo} · Gustavo Torres Fotografías`;
+  pintar();
+}
+function fin(t,s){$("#app").innerHTML=`<div class="center"><img src="/logo.png" alt="Gustavo Torres Fotografías" style="width:240px;max-width:80%"><h2 class="serif" style="font-weight:500;margin:24px 0 6px">${esc(t)}</h2><p style="color:#5f5e5a">${esc(s)}</p><p style="margin-top:24px"><a href="https://instagram.com/gustavotorres_fotografias" style="color:#BB1E9F;font-weight:600;text-decoration:none">@gustavotorres_fotografias</a></p></div>`;}
+function pedirPin(j){
+  $("#app").innerHTML=`<div class="center"><img src="/logo.png" alt="Gustavo Torres Fotografías" style="width:240px;max-width:80%"><h2 class="serif" style="font-weight:500;margin:26px 0 4px">${esc(j.titulo||"Tu galería")}</h2><p style="color:#5f5e5a;margin:0">Ingresá el PIN que te mandamos</p><input id="pin" inputmode="numeric" maxlength="8" autocomplete="off"><div style="color:#A32D2D;font-size:13px;min-height:18px">${esc(j.error||"")}</div><button class="bp" id="pok" style="margin-top:8px"><i class="ti ti-lock-open"></i> Ver mis fotos</button></div>`;
+  const go=()=>{const v=$("#pin").value.trim();if(v)cargar(v);};$("#pok").onclick=go;$("#pin").onkeydown=e=>{if(e.key==="Enter")go();};$("#pin").focus();
+}
+function todas(){return G.secciones.flatMap(s=>s.fotos.map(f=>({...f,sec:s.nombre})));}
+function filtrar(){const t=todas();return tab==="Todas"?t:tab==="Favoritas"?t.filter(f=>favs.has(f.id)):t.filter(f=>f.sec===tab);}
+function pintar(){
+  const muestra=G.modo!=="final";
+  const secs=G.secciones.map(s=>s.nombre);const multi=secs.length>1;
+  $("#app").innerHTML=`
+  <header><img src="/logo.png" alt="Gustavo Torres Fotografías"><button id="vf"><i class="ti ti-heart"></i> Favoritas <b id="fc">${favs.size}</b></button></header>
+  <section class="hero" id="hero"><div class="in"><div class="k">${esc(G.subtitulo)}</div><h1 class="serif">${esc(G.titulo)}</h1><div style="font-size:14px;opacity:.9">${G.total} fotos</div></div></section>
+  <div class="wrap">
+    ${G.mensaje?`<p class="msg serif">“${esc(G.mensaje)}”<br><span style="font-size:14px;font-style:normal;font-family:Montserrat">— Gustavo</span></p>`:""}
+    <div class="bar"><div class="tabs" id="tabs"></div>${muestra?"":`<button class="bp" id="dall"><i class="ti ti-download"></i> Descargar todo</button>`}</div>
+    <div class="nota" style="background:${muestra?"#FFF6F0;color:#A4471A":"#EAF3DE;color:#27500A"}">${muestra?'<i class="ti ti-lock"></i> Esta es una vista previa con marca de agua. Podés marcar tus favoritas con el corazón. La descarga se habilita cuando se complete la entrega.':'<i class="ti ti-download"></i> Tus fotos en alta calidad, listas para descargar. Tocá cualquier foto para verla grande.'}</div>
+    <div class="grid" id="grid"></div>
+  </div>
+  <footer><img src="/logo.png" alt="" style="height:34px;opacity:.9"><p>Gracias por confiar en nosotros. ¿Tenés otro evento? <br><a href="https://instagram.com/gustavotorres_fotografias" target="_blank" rel="noopener">@gustavotorres_fotografias</a></p></footer>`;
+  if(G.portada){const im=new Image();im.onload=()=>$("#hero").style.backgroundImage=`url(${im.src})`;im.src=url(G.portada,"f");}
+  $("#vf").onclick=()=>{tab="Favoritas";tabs();grid();$("#tabs").scrollIntoView({behavior:"smooth"});};
+  if($("#dall"))$("#dall").onclick=()=>{window.open(G.carpetaUrl,"_blank");toast("En Drive tocá ⋮ → Descargar para bajar todo junto");};
+  tabs();grid();
+}
+function tabs(){const secs=G.secciones.map(s=>s.nombre);const opts=["Todas",...(secs.length>1?secs:[]),...(favs.size?["Favoritas"]:[])];
+  if(!opts.includes(tab))tab="Todas";
+  $("#tabs").innerHTML=opts.map(o=>`<button class="${o===tab?"on":""}" data-t="${esc(o)}">${o==="Favoritas"?'<i class="ti ti-heart"></i> ':""}${esc(o)}${o==="Favoritas"?` (${favs.size})`:""}</button>`).join("");
+  $("#tabs").querySelectorAll("button").forEach(b=>b.onclick=()=>{tab=b.dataset.t;tabs();grid();});$("#fc").textContent=favs.size;}
+function grid(){
+  lista=filtrar();const muestra=G.modo!=="final";
+  $("#grid").innerHTML=lista.map((f,i)=>`<div class="ph" data-i="${i}" style="aspect-ratio:${f.w}/${f.h}">${favs.has(f.id)?'<span class="hz"><i class="ti ti-heart"></i></span>':""}<img loading="lazy" alt="" class="${muestra?"noimg":""}" data-src="${url(f.id,"t")}"></div>`).join("")||`<p style="color:#5f5e5a;text-align:center;padding:30px">Todavía no marcaste favoritas. Tocá el corazón en las fotos que más te gusten.</p>`;
+  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){const im=e.target;im.onload=()=>im.classList.add("ok");im.src=im.dataset.src;io.unobserve(im);}}),{rootMargin:"600px"});
+  $("#grid").querySelectorAll("img").forEach(im=>io.observe(im));
+  $("#grid").querySelectorAll(".ph").forEach(d=>d.onclick=()=>abrir(+d.dataset.i));
+}
+function abrir(i){if(!lista.length)return;cur=(i+lista.length)%lista.length;const f=lista[cur];
+  $("#lb").classList.add("on");document.body.style.overflow="hidden";
+  $("#lbi").src=url(f.id,"t");const hi=new Image();hi.onload=()=>{if(lista[cur]&&lista[cur].id===f.id)$("#lbi").src=hi.src;};hi.src=url(f.id,"f");
+  $("#lbt").textContent=`${f.sec!=="Fotos"?f.sec+" · ":""}${cur+1} de ${lista.length}`;
+  const fv=favs.has(f.id);$("#lbf").className=fv?"fav":"";$("#lbf").innerHTML=fv?'<i class="ti ti-heart"></i> En favoritas':'<i class="ti ti-heart"></i> Favorita';
+  $("#lbd").style.display=G.modo==="final"?"":"none";
+  [cur+1,cur-1].forEach(j=>{const g=lista[(j+lista.length)%lista.length];if(g)new Image().src=url(g.id,"f");});}
+function cerrar(){$("#lb").classList.remove("on");document.body.style.overflow="";if(tab==="Favoritas")return grid();document.querySelectorAll("#grid .ph").forEach(d=>{const f=lista[+d.dataset.i];const hz=d.querySelector(".hz");if(favs.has(f.id)&&!hz)d.insertAdjacentHTML("afterbegin",'<span class="hz"><i class="ti ti-heart"></i></span>');if(!favs.has(f.id)&&hz)hz.remove();});}
+$("#lbx").onclick=cerrar;$("#lbp").onclick=()=>abrir(cur-1);$("#lbn").onclick=()=>abrir(cur+1);
+document.addEventListener("keydown",e=>{if(!$("#lb").classList.contains("on"))return;if(e.key==="ArrowRight")abrir(cur+1);if(e.key==="ArrowLeft")abrir(cur-1);if(e.key==="Escape")cerrar();});
+let x0=null;$("#lbs").addEventListener("touchstart",e=>x0=e.touches[0].clientX,{passive:true});$("#lbs").addEventListener("touchend",e=>{if(x0===null)return;const dx=e.changedTouches[0].clientX-x0;if(Math.abs(dx)>50)abrir(cur+(dx<0?1:-1));x0=null;});
+$("#lbf").onclick=async()=>{const f=lista[cur];const on=!favs.has(f.id);on?favs.add(f.id):favs.delete(f.id);
+  try{localStorage.setItem("fav_"+slug,JSON.stringify([...favs]));}catch(e){}
+  abrir(cur);tabs();if(on)toast("Agregada a favoritas");
+  fetch("/api/favorito",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({g:slug,k:G.k,id:f.id,on})}).catch(()=>{});};
+$("#lbd").onclick=()=>{const f=lista[cur];location.href=`/api/descargar?g=${slug}&id=${f.id}&k=${G.k}`;};
+document.addEventListener("contextmenu",e=>{if(G&&G.modo!=="final"&&e.target.tagName==="IMG")e.preventDefault();});
+cargar();
+</script>
+</body>
+</html>

@@ -1,5 +1,11 @@
 {
   "crons": [
     { "path": "/api/cron", "schedule": "0 11 * * *" }
-  ]
+  ],
+  "rewrites": [
+    { "source": "/g/:slug", "destination": "/g.html" }
+  ],
+  "functions": {
+    "api/foto.js": { "maxDuration": 30, "memory": 1024, "includeFiles": "api/_wm.png" }
+  }
 }

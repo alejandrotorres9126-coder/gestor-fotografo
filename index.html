@@ -126,7 +126,7 @@ const MS=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Sep
 const MC=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 
 let U=null, unsubs=[];
-const S={tab:"inicio",q:"",sel:null,cm:new Date(),cl:[],tr:[],ta:[],fin:{},miembros:[],me:null,filtroTa:"pend"};
+const S={gal:[],tab:"inicio",q:"",sel:null,cm:new Date(),cl:[],tr:[],ta:[],fin:{},miembros:[],me:null,filtroTa:"pend"};
 const ADM=()=>S.me&&S.me.rol==="admin";
 S.cm=new Date(S.cm.getFullYear(),S.cm.getMonth(),1);
 
@@ -183,7 +183,7 @@ onAuthStateChanged(auth,async u=>{
   sub("clientes","cl");sub("trabajos","tr");sub("tareas","ta");
   if(ADM()){
     unsubs.push(onSnapshot(col("finanzas"),s=>{S.fin={};s.docs.forEach(d=>S.fin[d.id]=d.data());r();}));
-    sub("miembros","miembros");
+    sub("miembros","miembros");sub("galerias","gal");
   }
 });
 
@@ -259,7 +259,8 @@ function detalle(){
   <div style="display:flex;gap:6px;margin-top:14px;flex-wrap:wrap">${ADM()?`<button onclick="formPago('${t.id}')"><i class="ti ti-cash"></i> Registrar pago</button>`:""}${ci<5?`<button class="bp" onclick="setE('${t.id}','${ET[ci+1][0]}')"><i class="ti ti-arrow-right"></i> Pasar a ${ET[ci+1][1]}</button>`:""}<button onclick="resumen('${t.id}')"><i class="ti ti-send"></i> Enviar resumen al cliente</button><button onclick="voz('${t.id}')"><i class="ti ti-microphone"></i> Agregar por voz</button></div>
   ${ADM()&&(fin(t).pagos||[]).length?`<span class="lb" style="margin-top:16px">Pagos</span>${fin(t).pagos.map((p,k)=>`<div class="row"><i class="ti ti-cash" style="color:var(--ok)"></i><div style="flex:1">${money(p.monto)} <span class="sm muted">${esc(p.nota||"")}</span></div><span class="sm muted">${fd(p.fecha)}</span><button class="ic" style="border:none" title="Quitar pago" onclick="delPago('${t.id}',${k})"><i class="ti ti-x" style="color:var(--tx3)"></i></button></div>`).join("")}`:""}
   <span class="lb" style="margin-top:16px">Tareas de este trabajo</span>${ts.map(taRow).join("")||'<div class="sm muted">Sin tareas.</div>'}
-  <div style="display:flex;gap:6px;margin-top:10px"><input id="nt" placeholder="Ej: entregar fotos editadas"><input id="ntf" type="date" value="${hoy()}" style="max-width:160px"><button class="bp ic" onclick="addTa('${t.id}')"><i class="ti ti-plus"></i></button></div></div>`;
+  <div style="display:flex;gap:6px;margin-top:10px"><input id="nt" placeholder="Ej: entregar fotos editadas"><input id="ntf" type="date" value="${hoy()}" style="max-width:160px"><button class="bp ic" onclick="addTa('${t.id}')"><i class="ti ti-plus"></i></button></div></div>
+  ${ADM()?galCard(t):""}`;
 }
 function agenda(){
   const m=S.cm,y=m.getFullYear(),mo=m.getMonth(),H=hoy();const first=(new Date(y,mo,1).getDay()+6)%7;const dias=new Date(y,mo+1,0).getDate();
@@ -467,6 +468,62 @@ window.resumen=id=>{
   if(wa)$("#rwa").onclick=()=>window.open(wa+"?text="+encodeURIComponent($("#rs").value),"_blank");
   $("#rcp").onclick=()=>{navigator.clipboard.writeText($("#rs").value).then(()=>toast("Copiado"));};
 };
+
+/* ---------- ENTREGA DE FOTOS (GALERÍAS) ---------- */
+async function apiAdm(body){const tk=await auth.currentUser.getIdToken();const r=await fetch("/api/galeria-admin",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+tk},body:JSON.stringify(body)});const j=await r.json().catch(()=>({error:"Respuesta inválida ("+r.status+")"}));if(!r.ok)throw Object.assign(new Error(j.error||("Error "+r.status)),j);return j;}
+const galLink=g=>location.origin+"/g/"+g.id;
+function galCard(t){
+  const g=S.gal.find(x=>x.trabajoId==t.id);
+  if(!g)return `<div class="cd" style="margin-top:14px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><div><b><i class="ti ti-photo"></i> Entrega de fotos</b><div class="sm muted">Creá una galería con las fotos de Drive para mandarle al cliente.</div></div><button class="bp" onclick="formGal('${t.id}')"><i class="ti ti-plus"></i> Crear galería</button></div></div>`;
+  const fin0=g.modo==="final";const sugerir=!fin0&&fin(t).total>0&&saldo(t)<=0;
+  return `<div class="cd" style="margin-top:14px">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><b><i class="ti ti-photo"></i> Entrega de fotos</b>${fin0?pill("Entrega final","green"):pill("Muestra","ora")}</div>
+  <div style="display:inline-flex;background:var(--soft);border-radius:10px;padding:3px;gap:3px;margin:12px 0"><button onclick="galModo('${g.id}','muestra')" style="border:none;${fin0?"background:transparent":"background:var(--deep);color:#fff"}"><i class="ti ti-droplet"></i> Muestra</button><button onclick="galModo('${g.id}','final')" style="border:none;${fin0?"background:var(--deep);color:#fff":"background:transparent"}"><i class="ti ti-circle-check"></i> Entrega final</button></div>
+  ${sugerir?`<div class="sm" style="background:#EAF3DE;color:#27500A;padding:8px 12px;border-radius:8px;margin-bottom:8px"><i class="ti ti-cash"></i> El saldo está en $0. ¿Pasamos la galería a <b>Entrega final</b>?</div>`:""}
+  <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:10px"><div class="mt"><div class="l">Fotos</div><div style="font-weight:600">${g.total||0}</div></div><div class="mt"><div class="l">Visitas</div><div style="font-weight:600">${g.vistas||0}</div></div><div class="mt clk" onclick="galFavs('${g.id}')"><div class="l">Favoritas</div><div style="font-weight:600;color:var(--mag)">${(g.favoritos||[]).length} <i class="ti ti-chevron-right sm"></i></div></div></div>
+  <div style="display:flex;gap:6px;align-items:center;background:var(--soft);padding:8px 10px;border-radius:8px;margin-bottom:8px"><i class="ti ti-link muted"></i><span class="sm" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(galLink(g))}</span><button class="ic" title="Copiar link" onclick="navigator.clipboard.writeText('${galLink(g)}').then(()=>toast('Link copiado'))"><i class="ti ti-copy"></i></button></div>
+  <div class="sm muted" style="margin-bottom:10px">${g.pin?`<i class="ti ti-lock"></i> PIN: <b>${esc(g.pin)}</b> · `:""}${g.vence?`Vence el ${fd(g.vence)} · `:""}${g.ultimaVista?"Última visita: "+new Date(g.ultimaVista).toLocaleString("es-AR",{dateStyle:"short",timeStyle:"short"}):"El cliente todavía no la abrió"}</div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="bp" onclick="galWa('${g.id}')"><i class="ti ti-brand-whatsapp"></i> Enviar al cliente</button><a href="${galLink(g)}" target="_blank" rel="noopener"><button><i class="ti ti-external-link"></i> Ver galería</button></a><button onclick="formGal('${t.id}')"><i class="ti ti-edit"></i> Editar</button><button onclick="galRefrescar('${g.id}')" title="Volver a leer la carpeta de Drive"><i class="ti ti-refresh"></i> Actualizar fotos</button></div></div>`;
+}
+let SA_MAIL="";
+window.formGal=async tid=>{
+  const t=S.tr.find(x=>x.id==tid),c=cli(t.clienteId),g=S.gal.find(x=>x.trabajoId==tid)||{};
+  modal(`${head(g.id?"Editar galería":"Crear galería de fotos")}
+  <div class="mt sm" style="color:var(--tx2);margin-bottom:6px"><b style="color:var(--deep)">Antes de pegar el link:</b> en Drive, abrí la carpeta → <b>Compartir</b> → agregá este email como <b>Editor</b> (no hace falta hacerla pública):<div style="display:flex;gap:6px;align-items:center;margin-top:6px"><code id="saem" style="background:#fff;padding:6px 8px;border-radius:6px;flex:1;overflow:hidden;text-overflow:ellipsis;font-size:12px">${esc(SA_MAIL||"cargando…")}</code><button class="ic" onclick="navigator.clipboard.writeText($('#saem').textContent).then(()=>toast('Email copiado'))"><i class="ti ti-copy"></i></button></div></div>
+  <span class="lb">Link de la carpeta de Google Drive</span><input id="gc" value="${esc(g.carpetaUrl||"")}" placeholder="https://drive.google.com/drive/folders/...">
+  <span class="lb">Título</span><input id="gt" value="${esc(g.titulo||c.nombre)}">
+  <span class="lb">Subtítulo</span><input id="gs" value="${esc(g.subtitulo??(t.tipo+(t.fecha?" · "+fd(t.fecha):"")))}">
+  <span class="lb">Mensaje para el cliente</span><textarea id="gm" rows="3" placeholder="Fue un placer acompañarte en una noche tan especial...">${esc(g.mensaje||"")}</textarea>
+  <div class="g2"><div><span class="lb">PIN (opcional)</span><input id="gp" inputmode="numeric" maxlength="8" value="${esc(g.pin||"")}" placeholder="Sin PIN"></div><div><span class="lb">Vence (opcional)</span><input id="gv" type="date" value="${esc(g.vence||"")}"></div></div>
+  <div class="err" id="ger"></div>
+  <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap"><button class="bp" id="gok"><i class="ti ti-check"></i> Guardar</button><button onclick="cerrar()">Cancelar</button>${g.id?`<button class="bd" style="margin-left:auto" onclick="galBorrar('${g.id}')"><i class="ti ti-trash"></i> Borrar galería</button>`:""}</div>`);
+  if(!SA_MAIL)apiAdm({accion:"info"}).then(j=>{SA_MAIL=j.email;const e=$("#saem");if(e)e.textContent=SA_MAIL;}).catch(e=>{const x=$("#saem");if(x)x.textContent="No se pudo cargar: "+e.message;});
+  $("#gok").onclick=async()=>{
+    const er=m=>$("#ger").innerHTML=m;if(!$("#gc").value.trim())return er("Pegá el link de la carpeta de Drive");
+    $("#gok").disabled=true;$("#gok").innerHTML='<i class="ti ti-loader-2"></i> Leyendo la carpeta...';
+    try{const j=await apiAdm({accion:"guardar",slug:g.id||"",trabajoId:tid,carpeta:$("#gc").value,titulo:$("#gt").value,subtitulo:$("#gs").value,mensaje:$("#gm").value,pin:$("#gp").value,vence:$("#gv").value});
+      cerrar();toast(`Galería lista: ${j.total} fotos`);}
+    catch(e){er(e.message==="sin_acceso"?`No tengo acceso a esa carpeta. Compartila en Drive con <b>${esc(e.email)}</b> como Editor y probá de nuevo.`:esc(e.message));$("#gok").disabled=false;$("#gok").innerHTML='<i class="ti ti-check"></i> Guardar';}
+  };
+};
+window.galModo=async(slug,modo)=>{const g=S.gal.find(x=>x.id==slug);if(g.modo===modo||(modo==="muestra"&&!g.modo))return;
+  if(modo==="final"&&!confirm("¿Pasar a Entrega final? El cliente va a ver las fotos sin marca de agua y podrá descargar los originales."))return;
+  try{await apiAdm({accion:"modo",slug,modo});toast(modo==="final"?"Entrega final activada":"Volvió a modo Muestra");}
+  catch(e){alert(e.message==="necesita_editor"?"Para habilitar la descarga, compartí la carpeta de Drive con "+e.email+" como EDITOR (no solo lector).":"No se pudo: "+e.message);}};
+window.galRefrescar=async slug=>{const g=S.gal.find(x=>x.id==slug);try{const j=await apiAdm({accion:"guardar",slug,trabajoId:g.trabajoId,carpeta:g.carpetaUrl,titulo:g.titulo,subtitulo:g.subtitulo,mensaje:g.mensaje,pin:g.pin,vence:g.vence});toast(`Actualizada: ${j.total} fotos`);}catch(e){toast("No se pudo: "+e.message);}};
+window.galBorrar=async slug=>{if(!confirm("¿Borrar esta galería? El link deja de funcionar. Las fotos en Drive NO se borran."))return;try{await apiAdm({accion:"borrar",slug});cerrar();toast("Galería borrada");}catch(e){toast("No se pudo: "+e.message);}};
+window.galWa=slug=>{const g=S.gal.find(x=>x.id==slug);const t=S.tr.find(x=>x.id==g.trabajoId);const c=cli(t?.clienteId);const wa=waLink(c.telefono);
+  const txt=`Hola ${String(c.nombre||"").split(" ")[0]}! ${g.modo==="final"?"Ya están listas tus fotos 📸 Podés verlas y descargarlas acá:":"Te comparto una muestra de tus fotos 📸 Podés verlas acá y marcar con el corazón tus favoritas:"}\n\n${galLink(g)}${g.pin?`\n\nPIN de acceso: ${g.pin}`:""}\n\nGustavo Torres Fotografías`;
+  modal(`${head("Enviar galería")}<textarea id="gwt" rows="9">${esc(txt)}</textarea><div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">${wa?'<button class="bp" id="gws"><i class="ti ti-brand-whatsapp"></i> Enviar por WhatsApp</button>':'<span class="sm muted">El cliente no tiene teléfono cargado.</span>'}<button id="gwc"><i class="ti ti-copy"></i> Copiar</button></div>`);
+  if(wa)$("#gws").onclick=()=>window.open(wa+"?text="+encodeURIComponent($("#gwt").value),"_blank");$("#gwc").onclick=()=>navigator.clipboard.writeText($("#gwt").value).then(()=>toast("Copiado"));};
+window.galFavs=async slug=>{const g=S.gal.find(x=>x.id==slug);const ids=g.favoritos||[];
+  if(!ids.length){toast("El cliente todavía no marcó favoritas");return;}
+  modal(`${head(`Favoritas de ${esc(g.titulo)} (${ids.length})`)}<div class="sm muted" style="margin-bottom:8px">Las fotos que eligió el cliente, por ejemplo para el álbum.</div><div id="gfv" class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));gap:6px">Cargando…</div><div style="display:flex;gap:6px;margin-top:10px"><button id="gfn"><i class="ti ti-copy"></i> Copiar nombres de archivo</button></div>`);
+  try{const tk=await auth.currentUser.getIdToken();const r=await fetch(`/api/galeria?g=${slug}&pin=${encodeURIComponent(g.pin||"")}`,{headers:{Authorization:"Bearer "+tk}});const j=await r.json();
+    const map=Object.fromEntries(j.secciones.flatMap(s=>s.fotos.map(f=>[f.id,{...f,sec:s.nombre}])));const fs=ids.map(id=>map[id]).filter(Boolean);
+    $("#gfv").innerHTML=fs.map(f=>`<div><img loading="lazy" src="/api/foto?g=${slug}&id=${f.id}&s=t&k=${j.k}&m=${j.modo}&v=${j.v}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px"><div class="sm muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.n)}</div></div>`).join("");
+    $("#gfn").onclick=()=>navigator.clipboard.writeText(fs.map(f=>f.n).join("\n")).then(()=>toast("Nombres copiados"));
+  }catch(e){$("#gfv").textContent="No se pudieron cargar: "+e.message;}};
 
 /* ---------- DICTADO POR VOZ + IA ---------- */
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec=null;
