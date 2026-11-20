@@ -1,6 +1,6 @@
 // Funciones compartidas del servidor (los archivos que empiezan con "_" no son rutas públicas)
 import { initializeApp, cert, getApps } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 import { getFirestore } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 
@@ -15,7 +15,14 @@ function app() {
   return initializeApp({ credential: cert(JSON.parse(raw)) });
 }
 export const db = () => getFirestore(app());
-export const auth = () => getAuth(app());
+// Verificación del login de Firebase sin firebase-admin/auth (evita el error ERR_REQUIRE_ESM en Vercel)
+const JWKS = createRemoteJWKSet(new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"));
+const PROYECTO = () => { try { return JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT).project_id; } catch (e) { return "gestor-fotografo"; } };
+async function verificarToken(token) {
+  const p = PROYECTO();
+  const { payload } = await jwtVerify(token, JWKS, { issuer: `https://securetoken.google.com/${p}`, audience: p });
+  return { uid: payload.sub, email: payload.email || "" };
+}
 export const fcm = () => getMessaging(app());
 
 // Verifica el login de la app y devuelve { uid, email, rol }
@@ -24,7 +31,7 @@ export async function usuario(req) {
   const token = h.startsWith("Bearer ") ? h.slice(7) : "";
   if (!token) return null;
   try {
-    const d = await auth().verifyIdToken(token);
+    const d = await verificarToken(token);
     const email = (d.email || "").toLowerCase();
     if (email === ADMIN_EMAIL) return { uid: d.uid, email, rol: "admin" };
     const m = await db().doc(`miembros/${d.uid}`).get();
