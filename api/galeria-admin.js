@@ -1,5 +1,5 @@
 // Acciones del administrador sobre las galerías: crear/editar, cambiar modo, borrar
-import { db, usuario } from "./_lib.js";
+import { db, usuario, credenciales } from "./_lib.js";
 import { drive, idCarpeta, listar, llave, SA_EMAIL } from "./_drive.js";
 import { FieldValue } from "firebase-admin/firestore";
 
@@ -21,7 +21,15 @@ async function principal(req, res) {
   if (!u || u.rol !== "admin") return res.status(401).json({ error: "Solo el administrador" });
   const b = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
 
-  if (b.accion === "info") return res.json({ email: SA_EMAIL() });
+  if (b.accion === "info") {
+    let c = null;
+    try { c = credenciales(); } catch (e) { return res.status(500).json({ error: "Clave de servicio: " + e.message }); }
+    if (!c.client_email) {
+      const largo = String(process.env.FIREBASE_SERVICE_ACCOUNT || "").length;
+      return res.status(500).json({ error: `La clave no tiene "client_email". Campos que veo: ${Object.keys(c).join(", ") || "ninguno"}. Largo del texto: ${largo}` });
+    }
+    return res.json({ email: c.client_email });
+  }
 
   if (b.accion === "guardar") {
     const carpetaId = idCarpeta(b.carpeta);
