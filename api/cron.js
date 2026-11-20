@@ -7,7 +7,7 @@ import { db, fechaAR, diaSemanaAR, enviar, usuario } from "./_lib.js";
 const DIAS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
 const fdc = f => { const [y, m, d] = f.split("-"); return `${DIAS[new Date(+y, +m - 1, +d).getDay()]} ${d}/${m}`; };
 
-export default async function handler(req, res) {
+async function principal(req, res) {
   // Autorización: el cron de Vercel (CRON_SECRET) o el administrador desde la app (para probar)
   const secreto = process.env.CRON_SECRET;
   const esCron = secreto && req.headers.authorization === `Bearer ${secreto}`;
@@ -63,4 +63,9 @@ export default async function handler(req, res) {
   }
 
   return res.status(200).json({ ok: true, hoy, manana, enviados });
+}
+
+export default async function handler(req, res) {
+  try { return await principal(req, res); }
+  catch (e) { console.error(e); return res.status(500).json({ error: "Error del servidor: " + (e?.message || e) }); }
 }

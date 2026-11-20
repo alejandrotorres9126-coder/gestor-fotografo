@@ -3,7 +3,7 @@ import { usuario } from "./_lib.js";
 
 const MODELOS = (process.env.GEMINI_MODELOS || "gemini-2.5-flash,gemini-3.6-flash,gemini-2.5-flash-lite,gemini-2.0-flash").split(",");
 
-export default async function handler(req, res) {
+async function principal(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Método no permitido" });
   const u = await usuario(req);
   if (!u) return res.status(401).json({ error: "No autorizado" });
@@ -33,4 +33,9 @@ export default async function handler(req, res) {
     }
   }
   return res.status(502).json({ error: "Ningún modelo respondió", intentos });
+}
+
+export default async function handler(req, res) {
+  try { return await principal(req, res); }
+  catch (e) { console.error(e); return res.status(500).json({ error: "Error del servidor: " + (e?.message || e) }); }
 }
