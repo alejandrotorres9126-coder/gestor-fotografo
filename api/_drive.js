@@ -1,9 +1,10 @@
 // Acceso a Google Drive con la cuenta de servicio (la misma clave de Firebase)
 import { GoogleAuth } from "google-auth-library";
 import crypto from "node:crypto";
+import { credenciales } from "./_lib.js";
 
 let ga = null;
-const creds = () => JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || "{}");
+const creds = () => { try { return credenciales(); } catch (e) { return {}; } };
 export const SA_EMAIL = () => creds().client_email || "";
 
 async function token() {

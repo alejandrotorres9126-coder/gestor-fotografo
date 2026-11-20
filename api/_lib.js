@@ -8,16 +8,29 @@ export const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "alejandrotorres91.26@gma
 export const APP_URL = process.env.APP_URL || "https://gestor-fotografo.vercel.app/";
 export const TZ = "America/Argentina/Buenos_Aires";
 
+// Lee la clave de servicio aunque tenga texto de más (espacios, comillas, una copia repetida, etc.)
+export function credenciales() {
+  let raw = String(process.env.FIREBASE_SERVICE_ACCOUNT || "").trim();
+  if (!raw) throw new Error("Falta la variable FIREBASE_SERVICE_ACCOUNT en Vercel");
+  if (/^["']/.test(raw)) { try { const x = JSON.parse(raw); if (typeof x === "string") raw = x.trim(); } catch (e) { raw = raw.slice(1, -1); } }
+  const i = raw.indexOf("{"); if (i < 0) throw new Error("La variable FIREBASE_SERVICE_ACCOUNT no tiene el formato correcto");
+  let prof = 0, enTexto = false, esc = false;
+  for (let j = i; j < raw.length; j++) {
+    const c = raw[j];
+    if (enTexto) { if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') enTexto = false; continue; }
+    if (c === '"') enTexto = true; else if (c === "{") prof++; else if (c === "}") { prof--; if (prof === 0) return JSON.parse(raw.slice(i, j + 1)); }
+  }
+  throw new Error("La variable FIREBASE_SERVICE_ACCOUNT está incompleta");
+}
+
 function app() {
   if (getApps().length) return getApps()[0];
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!raw) throw new Error("Falta la variable FIREBASE_SERVICE_ACCOUNT en Vercel");
-  return initializeApp({ credential: cert(JSON.parse(raw)) });
+  return initializeApp({ credential: cert(credenciales()) });
 }
 export const db = () => getFirestore(app());
 // Verificación del login de Firebase sin firebase-admin/auth (evita el error ERR_REQUIRE_ESM en Vercel)
 const JWKS = createRemoteJWKSet(new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"));
-const PROYECTO = () => { try { return JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT).project_id; } catch (e) { return "gestor-fotografo"; } };
+const PROYECTO = () => { try { return credenciales().project_id; } catch (e) { return "gestor-fotografo"; } };
 async function verificarToken(token) {
   const p = PROYECTO();
   const { payload } = await jwtVerify(token, JWKS, { issuer: `https://securetoken.google.com/${p}`, audience: p });
