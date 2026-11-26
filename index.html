@@ -273,11 +273,61 @@ function agenda(){
   <div class="cd" style="margin-top:14px"><b>Trabajos de ${MS[mo].toLowerCase()}</b>${delMes.map(trRow).join("")||'<p class="sm muted">Sin trabajos este mes.</p>'}</div>`;
 }
 window.mv=n=>{S.cm=new Date(S.cm.getFullYear(),S.cm.getMonth()+n,1);r();};
+const FC0={deuda:"",tipo:"",etapa:"",fecha:"",desde:"",hasta:"",origen:"",extra:"",orden:"nombre"};
+S.fc=S.fc||{...FC0};
+function filtrarClientes(){
+  const q=S.q.toLowerCase().trim(),f=S.fc,H=hoy(),mes=H.slice(0,7);
+  const fin7=new Date();fin7.setDate(fin7.getDate()+30);const F30=fin7.toISOString().slice(0,10);
+  let l=S.cl.filter(c=>!q||c.nombre.toLowerCase().includes(q)||String(c.telefono).includes(q)||String(c.instagram||"").toLowerCase().includes(q));
+  l=l.map(c=>{const ts=S.tr.filter(t=>t.clienteId==c.id);return {c,ts,sal:ts.reduce((s,t)=>s+Math.max(0,saldo(t)),0),prox:ts.filter(t=>t.fecha>=H).map(t=>t.fecha).sort()[0]||"",ult:ts.map(t=>t.fecha||"").sort().pop()||""};});
+  const conT=fn=>x=>x.ts.some(fn);
+  if(f.deuda==="debe")l=l.filter(x=>x.sal>0);
+  if(f.deuda==="aldia")l=l.filter(x=>x.ts.length&&x.sal<=0);
+  if(f.deuda==="sena")l=l.filter(conT(t=>fin(t).total>0&&pagado(t)===0));
+  if(f.tipo)l=l.filter(conT(t=>t.tipo===f.tipo));
+  if(f.etapa)l=l.filter(conT(t=>t.etapa===f.etapa));
+  if(f.fecha==="prox30")l=l.filter(conT(t=>t.fecha>=H&&t.fecha<=F30));
+  if(f.fecha==="mes")l=l.filter(conT(t=>String(t.fecha).startsWith(mes)));
+  if(f.fecha==="futuros")l=l.filter(conT(t=>t.fecha>=H));
+  if(f.fecha==="pasados")l=l.filter(conT(t=>t.fecha&&t.fecha<H));
+  if(f.fecha==="sinfecha")l=l.filter(conT(t=>!t.fecha));
+  if(f.fecha==="rango")l=l.filter(conT(t=>t.fecha&&(!f.desde||t.fecha>=f.desde)&&(!f.hasta||t.fecha<=f.hasta)));
+  if(f.origen)l=l.filter(x=>x.c.origen===f.origen);
+  if(f.extra==="incompletos")l=l.filter(conT(t=>t.etapa!="entregado"&&falta(t).length));
+  if(f.extra==="sintrabajo")l=l.filter(x=>!x.ts.length);
+  if(f.extra==="sintel")l=l.filter(x=>!x.c.telefono);
+  if(f.extra==="sinentrega")l=l.filter(conT(t=>(t.etapa=="sesion"||t.etapa=="edicion")));
+  if(f.extra==="galmuestra")l=l.filter(conT(t=>S.gal.some(g=>g.trabajoId==t.id&&g.modo!=="final")));
+  if(f.extra==="galfinal")l=l.filter(conT(t=>S.gal.some(g=>g.trabajoId==t.id&&g.modo==="final")));
+  if(f.extra==="favs")l=l.filter(conT(t=>S.gal.some(g=>g.trabajoId==t.id&&(g.favoritos||[]).length)));
+  const o=f.orden;
+  l.sort((a,b)=>o==="deuda"?b.sal-a.sal:o==="prox"?(a.prox||"9").localeCompare(b.prox||"9"):o==="reciente"?b.ult.localeCompare(a.ult):a.c.nombre.localeCompare(b.c.nombre));
+  return l;
+}
+window.setFC=(k,v)=>{S.fc[k]=v;if(k==="fecha"&&v!=="rango"){S.fc.desde="";S.fc.hasta="";}r();};
+window.limpiarFC=()=>{S.fc={...FC0};r();};
 function clientes(){
-  const q=S.q.toLowerCase().trim();const l=S.cl.filter(c=>!q||c.nombre.toLowerCase().includes(q)||String(c.telefono).includes(q)||String(c.instagram||"").toLowerCase().includes(q)).sort((a,b)=>a.nombre.localeCompare(b.nombre));
-  return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px"><span class="muted sm">${S.cl.length} clientes</span><div style="display:flex;gap:6px"><button onclick="formCl()"><i class="ti ti-user-plus"></i> Nuevo cliente</button><button class="bp" onclick="formTr()"><i class="ti ti-plus"></i> Nuevo trabajo</button></div></div>
-  <div class="cd">${l.map(c=>{const ts=S.tr.filter(t=>t.clienteId==c.id);const sal=ts.reduce((s,t)=>s+Math.max(0,saldo(t)),0);
-  return `<div class="row clk" onclick="verCl('${c.id}')" style="align-items:flex-start"><div class="av" style="background:${avc(c.id)}">${esc(iniciales(c.nombre))}</div><div style="flex:1;min-width:0"><div style="font-weight:600">${esc(c.nombre)}</div><div class="sm muted">${esc(c.telefono||"")}${c.origen?" · "+esc(c.origen):""}</div><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">${ts.map(t=>pill(t.tipo+" "+fd(t.fecha),et(t.etapa)[2])).join("")}</div></div>${ADM()&&sal>0?`<span class="sm" style="color:var(--ora-t);font-weight:600">Debe ${money(sal)}</span>`:""}</div>`}).join("")||'<p class="muted sm">Sin clientes.</p>'}</div>`;
+  const f=S.fc,l=filtrarClientes();const activos=Object.keys(FC0).filter(k=>k!=="orden"&&f[k]).length;
+  const sel=(k,lab,opts)=>`<label style="display:flex;flex-direction:column;gap:3px;min-width:0"><span class="sm muted">${lab}</span><select onchange="setFC('${k}',this.value)" style="padding:8px;${f[k]?"border-color:var(--vio);background:#FBF8FE":""}">${opts.map(([v,t])=>`<option value="${esc(v)}" ${f[k]===v?"selected":""}>${esc(t)}</option>`).join("")}</select></label>`;
+  const tiposUsados=[...new Set([...TIPOS,...S.tr.map(t=>t.tipo).filter(Boolean)])];
+  const totalDeuda=l.reduce((s,x)=>s+x.sal,0);
+  const barra=`<div class="cd" style="margin-bottom:12px;padding:12px 14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b class="sm"><i class="ti ti-filter"></i> Filtros${activos?` <span class="pl" style="background:var(--deep);color:#fff">${activos}</span>`:""}</b>${activos?`<button class="ic" style="border:none;color:var(--mag)" onclick="limpiarFC()"><i class="ti ti-x"></i> Limpiar</button>`:""}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">
+    ${ADM()?sel("deuda","Pagos",[["","Todos"],["debe","Deben"],["aldia","Al día"],["sena","Sin seña"]]):""}
+    ${sel("tipo","Tipo de evento",[["","Todos"],...tiposUsados.map(t=>[t,t])])}
+    ${sel("etapa","Progreso",[["","Todas las etapas"],...ET.map(e=>[e[0],e[1]])])}
+    ${sel("fecha","Fecha del evento",[["","Cualquier fecha"],["prox30","Próximos 30 días"],["mes","Este mes"],["futuros","Futuros"],["pasados","Pasados"],["sinfecha","Sin fecha"],["rango","Elegir rango…"]])}
+    ${sel("origen","Cómo llegó",[["","Todos"],...ORIG.map(o=>[o,o])])}
+    ${sel("extra","Otros",[["","—"],["incompletos","Datos a completar"],["sinentrega","Por editar o entregar"],["galmuestra","Galería en muestra"],["galfinal","Galería entregada"],["favs","Eligieron favoritas"],["sintrabajo","Sin trabajos"],["sintel","Sin teléfono"]])}
+    ${sel("orden","Ordenar por",[["nombre","Nombre"],["prox","Próximo evento"],["reciente","Más recientes"],...(ADM()?[["deuda","Mayor deuda"]]:[])])}
+    </div>
+    ${f.fecha==="rango"?`<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><label class="sm muted" style="flex:1;min-width:140px">Desde<input type="date" value="${esc(f.desde)}" onchange="setFC('desde',this.value)"></label><label class="sm muted" style="flex:1;min-width:140px">Hasta<input type="date" value="${esc(f.hasta)}" onchange="setFC('hasta',this.value)"></label></div>`:""}
+  </div>`;
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap"><span class="muted sm">${l.length} de ${S.cl.length} clientes${ADM()&&totalDeuda>0?` · deben <b style="color:var(--ora-t)">${money(totalDeuda)}</b>`:""}</span><div style="display:flex;gap:6px"><button onclick="formCl()"><i class="ti ti-user-plus"></i> Nuevo cliente</button><button class="bp" onclick="formTr()"><i class="ti ti-plus"></i> Nuevo trabajo</button></div></div>
+  ${barra}
+  <div class="cd">${l.map(({c,ts,sal})=>{
+  return `<div class="row clk" onclick="verCl('${c.id}')" style="align-items:flex-start"><div class="av" style="background:${avc(c.id)}">${esc(iniciales(c.nombre))}</div><div style="flex:1;min-width:0"><div style="font-weight:600">${esc(c.nombre)}</div><div class="sm muted">${esc(c.telefono||"")}${c.origen?" · "+esc(c.origen):""}</div><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">${ts.map(t=>pill(t.tipo+" "+fd(t.fecha),et(t.etapa)[2])).join("")}</div></div>${ADM()&&sal>0?`<span class="sm" style="color:var(--ora-t);font-weight:600">Debe ${money(sal)}</span>`:""}</div>`}).join("")||'<p class="muted sm">Ningún cliente coincide con estos filtros.</p>'}</div>`;
 }
 window.verCl=id=>{S.sel=id;S.tab="cliente";r();window.scrollTo(0,0);};
 function cliente(){
